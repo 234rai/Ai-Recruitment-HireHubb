@@ -80,10 +80,6 @@ Ai-Recruitment - HireHubb is an AI-powered recruitment mobile application design
 
 Contributions are welcome! Fork this repository and submit a pull request, or open issues for bug fixes and feature requests.
 
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
 ---
 
 > **Note:** This project is under active development. Core app structure and features are in place, but more advanced functionality is being continuously added.
