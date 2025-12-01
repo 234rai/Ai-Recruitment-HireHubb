@@ -1,5 +1,7 @@
-// lib/screens/navigation/main_navigation_screen.dart
+// lib/navigation/main_navigation_screen.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // ADD THIS
+import '../providers/role_provider.dart'; // ADD THIS
 import 'home_screen.dart';
 import 'explore_screen.dart';
 import 'application_screen.dart';
@@ -38,14 +40,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     super.dispose();
   }
 
-  // List of screens for navigation
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    ExploreScreen(),
-    ApplicationsScreen(),
-    NotificationsScreen(),
-  ];
-
   void _onTabTapped(int index) {
     if (_currentIndex != index) {
       setState(() {
@@ -58,12 +52,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isDarkMode = Theme
+        .of(context)
+        .brightness == Brightness.dark;
+    final roleProvider = Provider.of<RoleProvider>(context);
+
+    // Show loading while role is being fetched
+    if (roleProvider.isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFFF2D55)),
+        ),
+      );
+    }
+
+    // ROLE-BASED SCREENS: Different screens for different roles
+    final List<Widget> screens = roleProvider.isRecruiter
+        ? _getRecruiterScreens()
+        : _getJobSeekerScreens();
 
     return Scaffold(
       body: FadeTransition(
         opacity: _animation,
-        child: _screens[_currentIndex],
+        child: screens[_currentIndex],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -85,43 +96,105 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  icon: Icons.home_outlined,
-                  selectedIcon: Icons.home,
-                  label: 'Home',
-                  index: 0,
-                  isDarkMode: isDarkMode,
-                ),
-                _buildNavItem(
-                  icon: Icons.explore_outlined,
-                  selectedIcon: Icons.explore,
-                  label: 'Explore',
-                  index: 1,
-                  isDarkMode: isDarkMode,
-                ),
-                _buildNavItem(
-                  icon: Icons.work_outline,
-                  selectedIcon: Icons.work,
-                  label: 'Applications',
-                  index: 2,
-                  isDarkMode: isDarkMode,
-                  showBadge: false, // Change to true if you want to show badge for new applications
-                ),
-                _buildNavItem(
-                  icon: Icons.notifications_none_sharp,
-                  selectedIcon: Icons.notifications,
-                  label: 'Notifications',
-                  index: 3,
-                  isDarkMode: isDarkMode,
-                  showBadge: true, // Show badge for new notifications
-                ),
-              ],
+              children: roleProvider.isRecruiter
+                  ? _getRecruiterNavItems(isDarkMode)
+                  : _getJobSeekerNavItems(isDarkMode),
             ),
           ),
         ),
       ),
     );
+  }
+
+  // JOB SEEKER SCREENS
+  List<Widget> _getJobSeekerScreens() {
+    return const [
+      HomeScreen(), // Job Feed
+      ExploreScreen(), // Explore Jobs
+      ApplicationsScreen(), // My Applications
+      NotificationsScreen(), // Notifications
+    ];
+  }
+
+  // RECRUITER SCREENS
+  List<Widget> _getRecruiterScreens() {
+    return const [
+      HomeScreen(), // Dashboard (will show recruiter view)
+      ExploreScreen(), // Find Candidates
+      ApplicationsScreen(), // Manage Applications (will show recruiter view)
+      NotificationsScreen(), // Notifications
+    ];
+  }
+
+  // JOB SEEKER NAV ITEMS
+  List<Widget> _getJobSeekerNavItems(bool isDarkMode) {
+    return [
+      _buildNavItem(
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
+        label: 'Home',
+        index: 0,
+        isDarkMode: isDarkMode,
+      ),
+      _buildNavItem(
+        icon: Icons.explore_outlined,
+        selectedIcon: Icons.explore,
+        label: 'Explore',
+        index: 1,
+        isDarkMode: isDarkMode,
+      ),
+      _buildNavItem(
+        icon: Icons.work_outline,
+        selectedIcon: Icons.work,
+        label: 'Applications',
+        index: 2,
+        isDarkMode: isDarkMode,
+      ),
+      _buildNavItem(
+        icon: Icons.notifications_none_sharp,
+        selectedIcon: Icons.notifications,
+        label: 'Notifications',
+        index: 3,
+        isDarkMode: isDarkMode,
+        showBadge: true,
+      ),
+    ];
+  }
+
+  // RECRUITER NAV ITEMS
+  List<Widget> _getRecruiterNavItems(bool isDarkMode) {
+    return [
+      _buildNavItem(
+        icon: Icons.dashboard_outlined,
+        selectedIcon: Icons.dashboard,
+        label: 'Dashboard',
+        index: 0,
+        isDarkMode: isDarkMode,
+      ),
+      _buildNavItem(
+        icon: Icons.people_outline,
+        selectedIcon: Icons.people,
+        label: 'Candidates',
+        index: 1,
+        isDarkMode: isDarkMode,
+      ),
+      _buildNavItem(
+        icon: Icons.description_outlined,
+        selectedIcon: Icons.description,
+        label: 'Applications',
+        index: 2,
+        isDarkMode: isDarkMode,
+        showBadge: true, // Show badge for new applications
+      ),
+      _buildNavItem(
+        icon: Icons.notifications_none_sharp,
+        selectedIcon: Icons.notifications,
+        label: 'Notifications',
+        index: 3,
+        isDarkMode: isDarkMode,
+        showBadge: true,
+      ),
+    ];
   }
 
   Widget _buildNavItem({
@@ -159,7 +232,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   isSelected ? selectedIcon : icon,
                   color: isSelected
                       ? const Color(0xFFFF2D55)
-                      : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
+                      : (isDarkMode ? Colors.grey.shade400 : Colors.grey
+                      .shade600),
                   size: 24,
                 ),
                 if (showBadge && !isSelected)
@@ -193,4 +267,4 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       ),
     );
   }
-}
+} 

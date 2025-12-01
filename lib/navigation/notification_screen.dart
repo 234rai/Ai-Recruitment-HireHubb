@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:major_project/services/notification_manager_service.dart';
 import 'package:major_project/services/notification_debug_service.dart';
+import 'package:major_project/providers/role_provider.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -36,9 +38,43 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  // Role-based notification filtering
+  Stream<QuerySnapshot>? _getRoleBasedNotificationsStream(RoleProvider roleProvider) {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      return null;
+    }
+
+    try {
+      if (roleProvider.isRecruiter) {
+        // For recruiters: filter to show only recruiter-relevant notifications
+        return _firestore
+            .collection('notifications')
+            .doc(currentUser.uid)
+            .collection('user_notifications')
+            .where('recipientType', isEqualTo: 'recruiter')
+            .orderBy('timestamp', descending: true)
+            .snapshots();
+      } else {
+        // For job seekers/students: filter to show relevant notifications
+        return _firestore
+            .collection('notifications')
+            .doc(currentUser.uid)
+            .collection('user_notifications')
+            .where('recipientType', whereIn: ['job_seeker', 'student', 'general'])
+            .orderBy('timestamp', descending: true)
+            .snapshots();
+      }
+    } catch (e) {
+      print('Error creating role-based notifications stream: $e');
+      return _getNotificationsStream(); // Fallback to original stream
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final roleProvider = Provider.of<RoleProvider>(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -48,8 +84,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ROLE-BASED HEADER
               Text(
-                'Notifications',
+                roleProvider.isRecruiter ? 'Recruiter Notifications' : 'Notifications',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -58,7 +95,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Stay updated with job alerts',
+                roleProvider.isRecruiter
+                    ? 'Stay updated with applicant alerts and messages'
+                    : 'Stay updated with job alerts and applications',
                 style: TextStyle(
                   fontSize: 14,
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -66,10 +105,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Notifications List
+              // Notifications List - USE ROLE-BASED STREAM
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
-                  stream: _getNotificationsStream(),
+                  stream: _getRoleBasedNotificationsStream(roleProvider) ?? _getNotificationsStream(),
                   builder: (context, snapshot) {
                     // Handle no user case
                     if (_auth.currentUser == null) {
@@ -98,7 +137,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     }
 
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return _buildEmptyState(isDarkMode);
+                      return _buildEmptyState(isDarkMode, roleProvider);
                     }
 
                     final notifications = snapshot.data!.docs;
@@ -114,6 +153,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           notification,
                           notificationId,
                           isDarkMode,
+                          roleProvider,
                         );
                       },
                     );
@@ -211,9 +251,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       Map<String, dynamic> notification,
       String notificationId,
       bool isDarkMode,
+      RoleProvider roleProvider,
       ) {
     final title = notification['title'] ?? 'Notification';
     final body = notification['body'] ?? '';
+
+    // ROLE-BASED BODY MODIFICATION
+    String displayBody = body;
+    if (roleProvider.isRecruiter) {
+      // For recruiters, emphasize applicant-related content
+      if (body.toLowerCase().contains('applied') ||
+          body.toLowerCase().contains('applicant') ||
+          body.toLowerCase().contains('application')) {
+        displayBody = "👤 $body";
+      }
+    } else {
+      // For job seekers, emphasize job-related content
+      if (body.toLowerCase().contains('job') ||
+          body.toLowerCase().contains('interview') ||
+          body.toLowerCase().contains('hired')) {
+        displayBody = "💼 $body";
+      }
+    }
 
     // IMPROVED: Better timestamp handling
     DateTime timestamp;
@@ -238,6 +297,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final isRead = notification['isRead'] ?? false;
     final jobId = notification['jobId'];
     final company = notification['company'] ?? '';
+    final senderName = notification['senderName'] ?? '';
+
+    // ROLE-BASED ACTION BUTTON TEXT
+    String actionButtonText = 'View Details';
+    if (roleProvider.isRecruiter) {
+      if (type == 'new_application') {
+        actionButtonText = 'Review Applicant';
+      } else if (type == 'message') {
+        actionButtonText = 'View Message';
+      }
+    } else {
+      if (type == 'application_update') {
+        actionButtonText = 'View Application';
+      } else if (type == 'interview_invite') {
+        actionButtonText = 'Schedule Interview';
+      }
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -258,12 +334,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: _getNotificationColor(type).withOpacity(0.1),
+                      color: _getNotificationColor(type, roleProvider).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
-                      _getNotificationIcon(type),
-                      color: _getNotificationColor(type),
+                      _getNotificationIcon(type, roleProvider),
+                      color: _getNotificationColor(type, roleProvider),
                       size: 20,
                     ),
                   ),
@@ -272,17 +348,43 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
+                        // ROLE-BASED TITLE WITH BADGE
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDarkMode ? Colors.white : Colors.black,
+                                ),
+                              ),
+                            ),
+                            if (roleProvider.isRecruiter && type == 'new_application')
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'NEW',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          body,
+                          displayBody,
                           style: TextStyle(
                             fontSize: 14,
                             color: isDarkMode
@@ -291,6 +393,31 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             height: 1.4,
                           ),
                         ),
+                        // ROLE-BASED SENDER INFO
+                        if (senderName.isNotEmpty && roleProvider.isRecruiter) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                size: 12,
+                                color: isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'From: $senderName',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDarkMode
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         if (company.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Container(
@@ -345,8 +472,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFF2D55),
+                      decoration: BoxDecoration(
+                        color: roleProvider.isRecruiter
+                            ? Colors.green
+                            : const Color(0xFFFF2D55),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -359,14 +488,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       _markAsRead(notificationId);
-                      // TODO: Navigate to job details
+                      // TODO: Navigate to job/applicant details based on role
+                      if (roleProvider.isRecruiter) {
+                        print('Recruiter viewing applicant for job: $jobId');
+                      } else {
+                        print('Job seeker viewing job: $jobId');
+                      }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF2D55),
+                      backgroundColor: roleProvider.isRecruiter
+                          ? Colors.green
+                          : const Color(0xFFFF2D55),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: const Text('View Job'),
+                    child: Text(actionButtonText),
                   ),
                 ),
               ],
@@ -408,7 +544,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Widget _buildEmptyState(bool isDarkMode) {
+  Widget _buildEmptyState(bool isDarkMode, RoleProvider roleProvider) {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -416,13 +552,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.notifications_outlined,
+              roleProvider.isRecruiter ? Icons.people_outline : Icons.notifications_outlined,
               size: 80,
               color: const Color(0xFFFF2D55).withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
-              'No Notifications',
+              roleProvider.isRecruiter ? 'No Applicant Notifications' : 'No Notifications',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -431,7 +567,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'All of your job notifications will appear here',
+              roleProvider.isRecruiter
+                  ? 'All of your applicant notifications will appear here'
+                  : 'All of your job notifications will appear here',
               style: TextStyle(
                 fontSize: 14,
                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -440,7 +578,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             const SizedBox(height: 30),
 
-            // Debug Section
+            // Debug Section - SAME FOR BOTH ROLES
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -527,7 +665,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       ),
                       const SizedBox(height: 10),
 
-                      // Test Direct Firestore - FIXED: Using public method
+                      // Test Direct Firestore
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
@@ -544,12 +682,48 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             }
 
                             final debugService = NotificationDebugService();
-                            await debugService.createTestNotificationDirectly(context, currentUser.uid); // FIXED: Now using public method
+                            await debugService.createTestNotificationDirectly(context, currentUser.uid);
                           },
                           icon: const Icon(Icons.cloud_upload),
                           label: const Text('Test Direct Firestore'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // ROLE-BASED TEST NOTIFICATIONS - FIXED
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final currentUser = _auth.currentUser;
+                            if (currentUser == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Please log in to test notifications'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Create role-based test notification directly
+                            await _createRoleBasedTestNotification(
+                                context,
+                                currentUser.uid,
+                                roleProvider.isRecruiter
+                            );
+                          },
+                          icon: Icon(roleProvider.isRecruiter ? Icons.person : Icons.work),
+                          label: Text(roleProvider.isRecruiter
+                              ? 'Test Recruiter Notification'
+                              : 'Test Job Seeker Notification'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: roleProvider.isRecruiter ? Colors.purple : Colors.orange,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
@@ -564,7 +738,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           onPressed: () async {
                             final debugService = NotificationDebugService();
                             await debugService.clearAllNotifications(context);
-                            setState(() {}); // Refresh the UI
+                            setState(() {});
                           },
                           icon: const Icon(Icons.cleaning_services),
                           label: const Text('Clear All Notifications'),
@@ -602,7 +776,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
             const SizedBox(height: 20),
 
-            // Status Information
+            // Status Information - SAME FOR BOTH ROLES
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -654,6 +828,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       );
                     },
                   ),
+                  // ROLE-BASED STATUS
+                  const SizedBox(height: 4),
+                  Text(
+                    roleProvider.isRecruiter
+                        ? '👔 Viewing recruiter notifications'
+                        : '💼 Viewing job seeker notifications',
+                    style: TextStyle(
+                      color: roleProvider.isRecruiter ? Colors.blue : Colors.orange,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -663,33 +847,59 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Color _getNotificationColor(String type) {
-    switch (type) {
-      case 'application_update':
-        return const Color(0xFFFF2D55);
-      case 'job_match':
-        return const Color(0xFF34C759);
-      case 'viewed_profile':
-        return const Color(0xFF007AFF);
-      case 'new_job':
-        return const Color(0xFFFF9500);
-      default:
-        return const Color(0xFFFF2D55);
+  Color _getNotificationColor(String type, RoleProvider roleProvider) {
+    if (roleProvider.isRecruiter) {
+      switch (type) {
+        case 'new_application':
+          return Colors.green;
+        case 'message':
+          return Colors.blue;
+        case 'interview_scheduled':
+          return Colors.purple;
+        default:
+          return const Color(0xFFFF2D55);
+      }
+    } else {
+      switch (type) {
+        case 'application_update':
+          return const Color(0xFFFF2D55);
+        case 'job_match':
+          return const Color(0xFF34C759);
+        case 'viewed_profile':
+          return const Color(0xFF007AFF);
+        case 'new_job':
+          return const Color(0xFFFF9500);
+        default:
+          return const Color(0xFFFF2D55);
+      }
     }
   }
 
-  IconData _getNotificationIcon(String type) {
-    switch (type) {
-      case 'application_update':
-        return Icons.work_outline;
-      case 'job_match':
-        return Icons.auto_awesome_outlined;
-      case 'viewed_profile':
-        return Icons.remove_red_eye_outlined;
-      case 'new_job':
-        return Icons.new_releases_outlined;
-      default:
-        return Icons.notifications_outlined;
+  IconData _getNotificationIcon(String type, RoleProvider roleProvider) {
+    if (roleProvider.isRecruiter) {
+      switch (type) {
+        case 'new_application':
+          return Icons.person_add;
+        case 'message':
+          return Icons.message;
+        case 'interview_scheduled':
+          return Icons.calendar_today;
+        default:
+          return Icons.notifications_outlined;
+      }
+    } else {
+      switch (type) {
+        case 'application_update':
+          return Icons.work_outline;
+        case 'job_match':
+          return Icons.auto_awesome_outlined;
+        case 'viewed_profile':
+          return Icons.remove_red_eye_outlined;
+        case 'new_job':
+          return Icons.new_releases_outlined;
+        default:
+          return Icons.notifications_outlined;
+      }
     }
   }
 
@@ -755,7 +965,60 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  // Add this method as a fallback if you prefer local implementation
+  // NEW METHOD: Create role-based test notification
+  Future<void> _createRoleBasedTestNotification(BuildContext context, String userId, bool isRecruiter) async {
+    try {
+      print('📝 Creating role-based test notification...');
+
+      final notificationData = {
+        'title': isRecruiter ? '👔 New Applicant Alert' : '💼 Job Application Update',
+        'body': isRecruiter
+            ? 'John Doe has applied for your Senior Flutter Developer position'
+            : 'Your application for Senior Flutter Developer has been reviewed',
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': isRecruiter ? 'new_application' : 'application_update',
+        'isRead': false,
+        'recipientType': isRecruiter ? 'recruiter' : 'job_seeker',
+        'company': isRecruiter ? 'Your Company' : 'Google',
+        'senderName': isRecruiter ? 'Job Portal System' : 'HR Department',
+        'jobId': 'test_job_123',
+        'data': {
+          'test': true,
+          'role': isRecruiter ? 'recruiter' : 'job_seeker',
+          'createdAt': DateTime.now().toIso8601String(),
+        }
+      };
+
+      await _firestore
+          .collection('notifications')
+          .doc(userId)
+          .collection('user_notifications')
+          .add(notificationData);
+
+      print('✅ Role-based test notification created for ${isRecruiter ? 'recruiter' : 'job_seeker'}');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ ${isRecruiter ? 'Recruiter' : 'Job Seeker'} test notification created!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Role-based test notification error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Failed to create test notification: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Fallback method (keep existing)
   Future<void> _createTestNotificationDirectly() async {
     try {
       final currentUser = _auth.currentUser;

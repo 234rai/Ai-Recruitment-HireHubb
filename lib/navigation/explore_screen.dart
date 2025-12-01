@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import '../providers/role_provider.dart'; // ADD THIS
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -29,6 +31,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   // Filter states for people
   String _selectedUserType = 'Any';
   String _selectedSkills = 'Any';
+
+  // New filter states for recruiters
+  String _selectedExperience = 'Any';
+  bool _openToWorkOnly = false;
 
   Stream<QuerySnapshot> get _jobsStream {
     Query query = _firestore.collection('jobs');
@@ -89,9 +95,54 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return query.snapshots();
   }
 
+  Stream<QuerySnapshot> get _candidatesStream {
+    Query query = _firestore.collection('users')
+        .where('userType', whereIn: ['job_seeker', 'student']);
+
+    if (_searchController.text.isNotEmpty) {
+      query = query.where('searchKeywords',
+          arrayContains: _searchController.text.toLowerCase());
+    }
+
+    if (_selectedCategory != 'All') {
+      if (_selectedCategory == 'Developers') {
+        query = query.where('skills',
+            arrayContainsAny: ['flutter', 'developer', 'programming']);
+      } else if (_selectedCategory == 'Designers') {
+        query = query.where('skills',
+            arrayContainsAny: ['design', 'ui/ux', 'figma']);
+      } else if (_selectedCategory == 'Managers') {
+        query = query.where('skills',
+            arrayContainsAny: ['management', 'leadership']);
+      } else if (_selectedCategory == 'Students') {
+        query = query.where('userType', isEqualTo: 'student');
+      }
+    }
+
+    if (_selectedSkills != 'Any') {
+      query = query.where('skills', arrayContains: _selectedSkills.toLowerCase());
+    }
+
+    if (_selectedExperience != 'Any') {
+      query = query.where('experienceLevel', isEqualTo: _selectedExperience.toLowerCase());
+    }
+
+    if (_openToWorkOnly) {
+      query = query.where('openToWork', isEqualTo: true);
+    }
+
+    return query.snapshots();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final roleProvider = Provider.of<RoleProvider>(context); // ADD THIS
+
+    // For recruiters, default to candidate search
+    if (roleProvider.isRecruiter && _searchMode == 'jobs') {
+      _searchMode = 'people';
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -106,7 +157,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Explore',
+                    roleProvider.isRecruiter ? 'Find Candidates' : 'Explore', // ROLE-BASED TITLE
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -116,7 +167,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   const SizedBox(height: 16),
 
                   // Expanded Search Bar
-                  _buildExpandedSearchBar(isDarkMode),
+                  _buildExpandedSearchBar(isDarkMode, roleProvider),
                 ],
               ),
             ),
@@ -129,16 +180,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
             // Results header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildResultsHeader(isDarkMode),
+              child: _buildResultsHeader(isDarkMode, roleProvider),
             ),
 
             const SizedBox(height: 12),
 
-            // Content List
+            // Content List - ROLE-BASED CONTENT
             Expanded(
-              child: _searchMode == 'jobs'
+              child: roleProvider.isRecruiter
+                  ? _buildCandidatesList(isDarkMode)
+                  : (_searchMode == 'jobs'
                   ? _buildJobsListFromFirestore(isDarkMode)
-                  : _buildUsersListFromFirestore(isDarkMode),
+                  : _buildUsersListFromFirestore(isDarkMode)),
             ),
           ],
         ),
@@ -146,7 +199,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildExpandedSearchBar(bool isDarkMode) {
+  Widget _buildExpandedSearchBar(bool isDarkMode, RoleProvider roleProvider) {
     return Row(
       children: [
         // Search Field
@@ -164,7 +217,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 fontSize: 16,
               ),
               decoration: InputDecoration(
-                hintText: 'Search jobs, people, companies...',
+                hintText: roleProvider.isRecruiter
+                    ? 'Search candidates by skills, experience...'
+                    : 'Search jobs, people, companies...',
                 hintStyle: TextStyle(
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                   fontSize: 16,
@@ -201,7 +256,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
         // Filter Button
         GestureDetector(
-          onTap: _showFilterBottomSheet,
+          onTap: () => roleProvider.isRecruiter
+              ? _showRecruiterFilterBottomSheet()
+              : _showFilterBottomSheet(),
           child: Container(
             height: 50,
             width: 50,
@@ -224,7 +281,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final List<String> activeFilters = [];
 
     // Add search mode
-    activeFilters.add(_searchMode == 'jobs' ? 'Jobs' : 'People');
+    final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+    if (!roleProvider.isRecruiter) {
+      activeFilters.add(_searchMode == 'jobs' ? 'Jobs' : 'People');
+    } else {
+      activeFilters.add('Candidates');
+    }
 
     // Add category if not 'All'
     if (_selectedCategory != 'All') {
@@ -232,12 +294,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
 
     // Add job filters
-    if (_searchMode == 'jobs') {
+    if (!roleProvider.isRecruiter && _searchMode == 'jobs') {
       if (_remoteOnly) activeFilters.add('Remote');
       if (_fullTimeOnly) activeFilters.add('Full-time');
       if (_highSalaryOnly) activeFilters.add('High Salary');
       if (_selectedJobType != 'Any') activeFilters.add(_selectedJobType);
       if (_selectedLocation != 'Any') activeFilters.add(_selectedLocation);
+    } else if (roleProvider.isRecruiter) {
+      // Add recruiter filters
+      if (_selectedSkills != 'Any') activeFilters.add(_selectedSkills);
+      if (_selectedExperience != 'Any') activeFilters.add(_selectedExperience);
+      if (_openToWorkOnly) activeFilters.add('Open to Work');
     } else {
       // Add people filters
       if (_selectedUserType != 'Any') activeFilters.add(_selectedUserType);
@@ -311,7 +378,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _removeFilter(String filter) {
     setState(() {
-      if (filter == 'Jobs' || filter == 'People') {
+      final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+
+      if (filter == 'Jobs' || filter == 'People' || filter == 'Candidates') {
         // Don't remove the main search mode
         return;
       } else if (filter == _selectedCategory) {
@@ -330,16 +399,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _selectedUserType = 'Any';
       } else if (filter == _selectedSkills) {
         _selectedSkills = 'Any';
+      } else if (filter == _selectedExperience) {
+        _selectedExperience = 'Any';
+      } else if (filter == 'Open to Work') {
+        _openToWorkOnly = false;
       }
     });
   }
 
-  Widget _buildResultsHeader(bool isDarkMode) {
+  Widget _buildResultsHeader(bool isDarkMode, RoleProvider roleProvider) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _searchMode == 'jobs' ? _jobsStream : _usersStream,
+      stream: roleProvider.isRecruiter
+          ? _candidatesStream
+          : (_searchMode == 'jobs' ? _jobsStream : _usersStream),
       builder: (context, snapshot) {
         final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
-        final resultText = _searchMode == 'jobs' ? '$count jobs found' : '$count people found';
+        final resultText = roleProvider.isRecruiter
+            ? '$count candidates found'
+            : _searchMode == 'jobs'
+            ? '$count jobs found'
+            : '$count people found';
 
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -354,13 +433,55 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
             if (count > 0)
               Text(
-                'Showing ${_searchMode == 'jobs' ? 'jobs' : 'people'}',
+                roleProvider.isRecruiter
+                    ? 'Showing candidates'
+                    : 'Showing ${_searchMode == 'jobs' ? 'jobs' : 'people'}',
                 style: TextStyle(
                   fontSize: 12,
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
               ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCandidatesList(bool isDarkMode) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _candidatesStream,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading candidates',
+              style: TextStyle(color: Colors.grey.shade400),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF2D55)),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState(isDarkMode, isRecruiter: true);
+        }
+
+        final candidates = snapshot.data!.docs;
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: candidates.length,
+          itemBuilder: (context, index) {
+            final doc = candidates[index];
+            final candidate = doc.data() as Map<String, dynamic>;
+            return _buildCandidateCard(doc.id, candidate, isDarkMode);
+          },
         );
       },
     );
@@ -461,7 +582,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildEmptyState(bool isDarkMode) {
+  Widget _buildEmptyState(bool isDarkMode, {bool isRecruiter = false}) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -473,7 +594,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            _searchMode == 'jobs' ? 'No jobs found' : 'No people found',
+            isRecruiter ? 'No candidates found'
+                : (_searchMode == 'jobs' ? 'No jobs found' : 'No people found'),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -504,6 +626,195 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCandidateCard(String userId, Map<String, dynamic> candidate, bool isDarkMode) {
+    final name = candidate['name']?.toString().trim() ?? 'Unknown Candidate';
+    final title = candidate['title']?.toString().trim() ?? 'No title';
+    final skills = candidate['skills'] is List
+        ? (candidate['skills'] as List).take(3).map((s) => s.toString()).toList()
+        : [];
+    final experience = candidate['experience']?.toString() ?? 'Not specified';
+    final openToWork = candidate['openToWork'] == true;
+    final location = candidate['location']?.toString() ?? 'Location not specified';
+
+    return GestureDetector(
+      onTap: () => _showCandidateProfile(userId, candidate, isDarkMode),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            if (!isDarkMode)
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFFF2D55).withOpacity(0.1),
+                  ),
+                  child: candidate['profileImage'] != null
+                      ? CircleAvatar(backgroundImage: NetworkImage(candidate['profileImage']!))
+                      : const Icon(Icons.person, size: 22, color: Color(0xFFFF2D55)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _buildInfoChip(Icons.work_outline, experience, isDarkMode),
+                          const SizedBox(width: 12),
+                          _buildInfoChip(Icons.location_on_outlined, location, isDarkMode),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (openToWork)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Open to work',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            if (skills.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Skills:',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: skills.map((skill) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey.shade700 : Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      skill,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDarkMode ? Colors.blue.shade200 : Colors.blue.shade700,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+
+            const SizedBox(height: 12),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: () => _messageCandidate(candidate),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    side: const BorderSide(color: Color(0xFFFF2D55)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.message_outlined,
+                        size: 14,
+                        color: const Color(0xFFFF2D55),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Message',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: const Color(0xFFFF2D55),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () => _viewFullProfile(candidate),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF2D55),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'View Profile',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -816,6 +1127,281 @@ class _ExploreScreenState extends State<ExploreScreen> {
       default:
         return const Color(0xFFFF2D55);
     }
+  }
+
+  void _showRecruiterFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.75,
+              minChildSize: 0.5,
+              maxChildSize: 0.9,
+              builder: (context, scrollController) {
+                return Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  child: Column(
+                    children: [
+                      // Handle
+                      Container(
+                        margin: const EdgeInsets.only(top: 10, bottom: 10),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+
+                      // Header
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Filter Candidates',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onBackground,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                _clearAllFilters();
+                                setModalState(() {});
+                              },
+                              child: const Text(
+                                'Clear All',
+                                style: TextStyle(color: Color(0xFFFF2D55)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Content
+                      Expanded(
+                        child: SingleChildScrollView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Categories
+                              _buildFilterSection('Categories', [
+                                _buildFilterChip(
+                                  'All',
+                                  _selectedCategory == 'All',
+                                      () {
+                                    setState(() => _selectedCategory = 'All');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'Developers',
+                                  _selectedCategory == 'Developers',
+                                      () {
+                                    setState(() => _selectedCategory = 'Developers');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'Designers',
+                                  _selectedCategory == 'Designers',
+                                      () {
+                                    setState(() => _selectedCategory = 'Designers');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'Managers',
+                                  _selectedCategory == 'Managers',
+                                      () {
+                                    setState(() => _selectedCategory = 'Managers');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'Students',
+                                  _selectedCategory == 'Students',
+                                      () {
+                                    setState(() => _selectedCategory = 'Students');
+                                    setModalState(() {});
+                                  },
+                                ),
+                              ]),
+
+                              const SizedBox(height: 24),
+
+                              // Skills
+                              _buildFilterSection('Skills', [
+                                _buildFilterChip(
+                                  'Any',
+                                  _selectedSkills == 'Any',
+                                      () {
+                                    setState(() => _selectedSkills = 'Any');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'Flutter',
+                                  _selectedSkills == 'Flutter',
+                                      () {
+                                    setState(() => _selectedSkills = 'Flutter');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'React',
+                                  _selectedSkills == 'React',
+                                      () {
+                                    setState(() => _selectedSkills = 'React');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'UI/UX',
+                                  _selectedSkills == 'UI/UX',
+                                      () {
+                                    setState(() => _selectedSkills = 'UI/UX');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'Python',
+                                  _selectedSkills == 'Python',
+                                      () {
+                                    setState(() => _selectedSkills = 'Python');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'Java',
+                                  _selectedSkills == 'Java',
+                                      () {
+                                    setState(() => _selectedSkills = 'Java');
+                                    setModalState(() {});
+                                  },
+                                ),
+                              ]),
+
+                              const SizedBox(height: 24),
+
+                              // Experience Level
+                              _buildFilterSection('Experience Level', [
+                                _buildFilterChip(
+                                  'Any',
+                                  _selectedExperience == 'Any',
+                                      () {
+                                    setState(() => _selectedExperience = 'Any');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'Entry Level',
+                                  _selectedExperience == 'Entry Level',
+                                      () {
+                                    setState(() => _selectedExperience = 'Entry Level');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'Mid Level',
+                                  _selectedExperience == 'Mid Level',
+                                      () {
+                                    setState(() => _selectedExperience = 'Mid Level');
+                                    setModalState(() {});
+                                  },
+                                ),
+                                _buildFilterChip(
+                                  'Senior Level',
+                                  _selectedExperience == 'Senior Level',
+                                      () {
+                                    setState(() => _selectedExperience = 'Senior Level');
+                                    setModalState(() {});
+                                  },
+                                ),
+                              ]),
+
+                              const SizedBox(height: 20),
+
+                              // Additional Options
+                              _buildFilterOption(
+                                'Only show open to work',
+                                _openToWorkOnly,
+                                    (value) {
+                                  setState(() => _openToWorkOnly = value!);
+                                  setModalState(() {});
+                                },
+                              ),
+
+                              const SizedBox(height: 70),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Apply Button
+                      Container(
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          10,
+                          20,
+                          MediaQuery.of(context).padding.bottom + 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, -2),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            setState(() {});
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF2D55),
+                            minimumSize: const Size(double.infinity, 48),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Apply Filters',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showFilterBottomSheet() {
@@ -1210,6 +1796,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _selectedJobType = 'Any';
       _selectedUserType = 'Any';
       _selectedSkills = 'Any';
+      _selectedExperience = 'Any';
+      _openToWorkOnly = false;
     });
   }
 
@@ -1235,5 +1823,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _showUserProfile(String userId, Map<String, dynamic> user, bool isDarkMode) {
     print('Show user profile: ${user['name']}');
+  }
+
+  void _showCandidateProfile(String userId, Map<String, dynamic> candidate, bool isDarkMode) {
+    print('Show candidate profile: ${candidate['name']}');
+  }
+
+  void _messageCandidate(Map<String, dynamic> candidate) {
+    print('Message candidate: ${candidate['name']}');
+    // Implement messaging functionality
+  }
+
+  void _viewFullProfile(Map<String, dynamic> candidate) {
+    print('View full profile of: ${candidate['name']}');
+    // Navigate to full profile screen
   }
 }

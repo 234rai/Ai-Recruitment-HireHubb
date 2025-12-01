@@ -1,6 +1,8 @@
+// lib/navigation/home_screen.dart - UPDATED VERSION
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../services/firestore_service.dart';
 import '../services/realtime_database_service.dart';
 import '../navigation/drawer_navigation/profile_screen.dart';
@@ -11,6 +13,8 @@ import '../services/application_service.dart';
 import 'application_screen.dart';
 import 'drawer_navigation/saved_jobs_screen.dart';
 import 'chatbot_screen.dart';
+import 'settings_screen.dart';
+import '../providers/role_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -53,9 +57,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-  // ADD THIS NEW METHOD FOR CHAT ASSISTANT
   void _openChatAssistant() {
-    Navigator.pop(context); // Close drawer
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ChatbotScreen()),
+    );
+  }
+
+  void _openChatbot() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ChatbotScreen()),
@@ -142,6 +152,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ApplicationsScreen()),
+    );
+  }
+
+  void _openSettings() {
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SettingsScreen()),
     );
   }
 
@@ -309,13 +327,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final user = FirebaseAuth.instance.currentUser;
+    final roleProvider = Provider.of<RoleProvider>(context);
 
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawerScrimColor: Colors.black.withOpacity(0.5),
       drawerEnableOpenDragGesture: true,
-      drawer: _buildDrawer(context, user, isDarkMode),
+      drawer: _buildDrawer(context, user, isDarkMode, roleProvider),
       onDrawerChanged: (isOpened) {
         if (isOpened) {
           _drawerAnimationController.forward();
@@ -323,221 +342,337 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           _drawerAnimationController.reverse();
         }
       },
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '👋 Hi, ${_userProfile?['name']?.toString().split(' ')[0] ?? user?.displayName?.split(' ')[0] ?? 'User'}',
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDarkMode ? Colors.white : Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  roleProvider.isRecruiter
+                                      ? 'Find your ideal candidate today!'
+                                      : 'Find your dream job today!',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                _scaffoldKey.currentState?.openDrawer();
+                              },
+                              child: _getProfileAvatar(24),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        Container(
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = value;
+                              });
+                            },
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: roleProvider.isRecruiter
+                                  ? 'Search candidates or jobs...'
+                                  : 'Start your job search',
+                              hintStyle: TextStyle(
+                                color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade500,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              ),
+                              suffixIcon: Container(
+                                margin: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF2D55),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.tune,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '👋 Hi, ${_userProfile?['name']?.toString().split(' ')[0] ?? user?.displayName?.split(' ')[0] ?? 'User'}',
+                              roleProvider.isRecruiter ? 'Dashboard' : 'Job Feed',
                               style: TextStyle(
-                                fontSize: 28,
+                                fontSize: 20,
                                 fontWeight: FontWeight.bold,
                                 color: isDarkMode ? Colors.white : Colors.black,
                               ),
                             ),
-                            const SizedBox(height: 4),
                             Text(
-                              'Find your dream job today!',
+                              roleProvider.isRecruiter
+                                  ? 'Your hiring activities'
+                                  : 'Jobs based on your activity',
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 12,
                                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                               ),
                             ),
                           ],
                         ),
-                        GestureDetector(
-                          onTap: () {
-                            _scaffoldKey.currentState?.openDrawer();
-                          },
-                          child: _getProfileAvatar(24),
-                        ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                  ),
+                ),
 
-                    Container(
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                // ROLE-BASED CONTENT
+                roleProvider.isRecruiter
+                    ? _buildRecruiterContent(isDarkMode)
+                    : _buildJobSeekerContent(isDarkMode),
+
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 20),
+                ),
+              ],
+            ),
+          ),
+
+          Positioned(
+            bottom: 20,
+            right: 20,
+            child: FloatingActionButton(
+              onPressed: _openChatbot,
+              backgroundColor: const Color(0xFFFF2D55),
+              child: const Icon(Icons.smart_toy, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // NEW METHOD: Recruiter Dashboard Content
+  Widget _buildRecruiterContent(bool isDarkMode) {
+    // For now, we'll show a placeholder message
+    // Later you can implement actual recruiter dashboard
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(bottom: 20),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.08),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Welcome Back,',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Recruiter!',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
                           ),
                         ],
                       ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        decoration: InputDecoration(
-                          hintText: 'Start your job search',
-                          hintStyle: TextStyle(
-                            color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade500,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                          suffixIcon: Container(
-                            margin: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFF2D55),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.tune,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Job Feed',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                        ),
-                        Text(
-                          'Jobs based on your activity',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            StreamBuilder<List<Job>>(
-              stream: FirestoreService.getPersonalizedJobFeed(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFFFF2D55),
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                if (snapshot.hasError) {
-                  return SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Center(
-                        child: Text(
-                          'Error loading jobs: ${snapshot.error}',
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Center(
-                        child: Column(
+                        child: const Row(
                           children: [
-                            Icon(
-                              Icons.work_outline,
-                              size: 64,
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                            ),
-                            const SizedBox(height: 16),
+                            Icon(Icons.verified, size: 16, color: Color(0xFF10B981)),
+                            SizedBox(width: 6),
                             Text(
-                              'No jobs available',
+                              'Active',
                               style: TextStyle(
-                                fontSize: 18,
-                                color: isDarkMode ? Colors.white : Colors.black,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Check back later for new opportunities',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF10B981),
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  );
-                }
-
-                final jobs = snapshot.data!;
-                List<Job> filteredJobs = jobs;
-
-                if (_searchQuery.isNotEmpty) {
-                  filteredJobs = jobs.where((job) {
-                    return job.position.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                        job.company.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                        job.skills.any((skill) => skill.toLowerCase().contains(_searchQuery.toLowerCase()));
-                  }).toList();
-                }
-
-                return SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                        final job = filteredJobs[index];
-                        return _buildJobCard(job, isDarkMode);
-                      },
-                      childCount: filteredJobs.length,
-                    ),
+                    ],
                   ),
-                );
-              },
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildRecruiterStat(
+                        icon: Icons.work_outline,
+                        value: '0',
+                        label: 'Jobs Posted',
+                        isDarkMode: isDarkMode,
+                      ),
+                      _buildRecruiterStat(
+                        icon: Icons.people_outline,
+                        value: '0',
+                        label: 'Applicants',
+                        isDarkMode: isDarkMode,
+                      ),
+                      _buildRecruiterStat(
+                        icon: Icons.trending_up,
+                        value: '0',
+                        label: 'Interviews',
+                        isDarkMode: isDarkMode,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
 
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.08),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Quick Actions',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 3,
+                    children: [
+                      _buildRecruiterAction(
+                        icon: Icons.add_box_outlined,
+                        label: 'Post New Job',
+                        onTap: () {
+                          // TODO: Navigate to post job screen
+                        },
+                        isDarkMode: isDarkMode,
+                      ),
+                      _buildRecruiterAction(
+                        icon: Icons.people_outline,
+                        label: 'View Candidates',
+                        onTap: () {
+                          // TODO: Navigate to candidates screen
+                        },
+                        isDarkMode: isDarkMode,
+                      ),
+                      _buildRecruiterAction(
+                        icon: Icons.description_outlined,
+                        label: 'Applications',
+                        onTap: _openApplications,
+                        isDarkMode: isDarkMode,
+                      ),
+                      _buildRecruiterAction(
+                        icon: Icons.analytics_outlined,
+                        label: 'Analytics',
+                        onTap: () {
+                          // TODO: Navigate to analytics
+                        },
+                        isDarkMode: isDarkMode,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+            Text(
+              'Feature Coming Soon',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
             ),
           ],
         ),
@@ -545,7 +680,189 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildDrawer(BuildContext context, User? user, bool isDarkMode) {
+  Widget _buildRecruiterStat({
+    required IconData icon,
+    required String value,
+    required String label,
+    required bool isDarkMode,
+  }) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF2D55).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: const Color(0xFFFF2D55),
+            size: 24,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecruiterAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required bool isDarkMode,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: const Color(0xFFFF2D55),
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Job Seeker Content (your existing job feed)
+  Widget _buildJobSeekerContent(bool isDarkMode) {
+    return StreamBuilder<List<Job>>(
+      stream: FirestoreService.getPersonalizedJobFeed(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFFFF2D55),
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Center(
+                child: Text(
+                  'Error loading jobs: ${snapshot.error}',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.work_outline,
+                      size: 64,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No jobs available',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Check back later for new opportunities',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        final jobs = snapshot.data!;
+        List<Job> filteredJobs = jobs;
+
+        if (_searchQuery.isNotEmpty) {
+          filteredJobs = jobs.where((job) {
+            return job.position.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                job.company.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                job.skills.any((skill) => skill.toLowerCase().contains(_searchQuery.toLowerCase()));
+          }).toList();
+        }
+
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                final job = filteredJobs[index];
+                return _buildJobCard(job, isDarkMode);
+              },
+              childCount: filteredJobs.length,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context, User? user, bool isDarkMode, RoleProvider roleProvider) {
     return Drawer(
       backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
       elevation: 16,
@@ -597,6 +914,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
+                              Text(
+                                '${roleProvider.userRole?.displayName ?? 'User'}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: const Color(0xFFFF2D55),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               Text(
                                 _userProfile?['email'] ?? user?.email ?? 'user@example.com',
                                 style: TextStyle(
@@ -656,96 +981,188 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Column(
                     children: [
-                      _buildDrawerItem(
-                        icon: Icons.person_outline,
-                        title: 'My Profile',
-                        onTap: _openProfile,
-                        isDarkMode: isDarkMode,
-                      ),
-                      _buildDrawerItem(
-                        icon: Icons.work_outline,
-                        title: 'My Applications',
-                        onTap: _openApplications,
-                        isDarkMode: isDarkMode,
-                      ),
-                      _buildDrawerItem(
-                        icon: Icons.favorite_outline,
-                        title: 'Saved Jobs',
-                        onTap: _openSavedJobs,
-                        isDarkMode: isDarkMode,
-                      ),
-
-                      // UPDATED AI FEATURES SECTION WITH CHAT ASSISTANT
-                      Theme(
-                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          leading: Icon(
-                            Icons.auto_awesome_outlined,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                            size: 20,
-                          ),
-                          title: Text(
-                            'AI Features',
-                            style: TextStyle(
-                              color: isDarkMode ? Colors.white : Colors.black,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                          collapsedIconColor:
-                          isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          iconColor: isDarkMode ? Colors.white : const Color(0xFFFF2D55),
-                          childrenPadding: const EdgeInsets.only(left: 50, bottom: 8, right: 16),
-                          children: [
-                            // AI Resume Checker
-                            ListTile(
-                              leading: Icon(
-                                Icons.description_outlined,
-                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                                size: 18,
-                              ),
-                              title: Text(
-                                'AI Resume Checker',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: isDarkMode ? Colors.white : Colors.black,
-                                ),
-                              ),
-                              onTap: _openAIResumeChecker,
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                              visualDensity: VisualDensity.compact,
-                            ),
-
-                            // CHAT ASSISTANT - NEW OPTION ADDED
-                            ListTile(
-                              leading: Icon(
-                                Icons.chat_outlined,
-                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                                size: 18,
-                              ),
-                              title: Text(
-                                'Chat Assistant',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: isDarkMode ? Colors.white : Colors.black,
-                                ),
-                              ),
-                              onTap: _openChatAssistant,
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ],
+                      // ROLE-BASED DRAWER ITEMS
+                      if (roleProvider.isJobSeeker) ...[
+                        _buildDrawerItem(
+                          icon: Icons.person_outline,
+                          title: 'My Profile',
+                          onTap: _openProfile,
+                          isDarkMode: isDarkMode,
                         ),
-                      ),
+                        _buildDrawerItem(
+                          icon: Icons.work_outline,
+                          title: 'My Applications',
+                          onTap: _openApplications,
+                          isDarkMode: isDarkMode,
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.favorite_outline,
+                          title: 'Saved Jobs',
+                          onTap: _openSavedJobs,
+                          isDarkMode: isDarkMode,
+                        ),
+                        Theme(
+                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                            leading: Icon(
+                              Icons.auto_awesome_outlined,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              size: 20,
+                            ),
+                            title: Text(
+                              'AI Features',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                            collapsedIconColor:
+                            isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            iconColor: isDarkMode ? Colors.white : const Color(0xFFFF2D55),
+                            childrenPadding: const EdgeInsets.only(left: 50, bottom: 8, right: 16),
+                            children: [
+                              ListTile(
+                                leading: Icon(
+                                  Icons.description_outlined,
+                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                  size: 18,
+                                ),
+                                title: Text(
+                                  'AI Resume Checker',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDarkMode ? Colors.white : Colors.black,
+                                  ),
+                                ),
+                                onTap: _openAIResumeChecker,
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              ListTile(
+                                leading: Icon(
+                                  Icons.chat_outlined,
+                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                  size: 18,
+                                ),
+                                title: Text(
+                                  'Chat Assistant',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDarkMode ? Colors.white : Colors.black,
+                                  ),
+                                ),
+                                onTap: _openChatAssistant,
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else if (roleProvider.isRecruiter) ...[
+                        _buildDrawerItem(
+                          icon: Icons.dashboard_outlined,
+                          title: 'Dashboard',
+                          onTap: () {},
+                          isDarkMode: isDarkMode,
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.add_box_outlined,
+                          title: 'Post a Job',
+                          onTap: () {},
+                          isDarkMode: isDarkMode,
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.people_outline,
+                          title: 'Candidates Pool',
+                          onTap: () {},
+                          isDarkMode: isDarkMode,
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.assignment_outlined,
+                          title: 'Applications',
+                          onTap: _openApplications,
+                          isDarkMode: isDarkMode,
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.business_outlined,
+                          title: 'Company Profile',
+                          onTap: _openProfile,
+                          isDarkMode: isDarkMode,
+                        ),
+                        Theme(
+                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                            leading: Icon(
+                              Icons.analytics_outlined,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              size: 20,
+                            ),
+                            title: Text(
+                              'Analytics',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                            collapsedIconColor:
+                            isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            iconColor: isDarkMode ? Colors.white : const Color(0xFFFF2D55),
+                            childrenPadding: const EdgeInsets.only(left: 50, bottom: 8, right: 16),
+                            children: [
+                              ListTile(
+                                leading: Icon(
+                                  Icons.bar_chart_outlined,
+                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                  size: 18,
+                                ),
+                                title: Text(
+                                  'Job Performance',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDarkMode ? Colors.white : Colors.black,
+                                  ),
+                                ),
+                                onTap: () {},
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              ListTile(
+                                leading: Icon(
+                                  Icons.trending_up_outlined,
+                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                  size: 18,
+                                ),
+                                title: Text(
+                                  'Hiring Metrics',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDarkMode ? Colors.white : Colors.black,
+                                  ),
+                                ),
+                                onTap: () {},
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
 
+                      // COMMON ITEMS FOR BOTH ROLES
                       _buildDrawerItem(
                         icon: Icons.settings_outlined,
                         title: 'Settings',
-                        onTap: () {},
+                        onTap: _openSettings,
                         isDarkMode: isDarkMode,
                       ),
                     ],

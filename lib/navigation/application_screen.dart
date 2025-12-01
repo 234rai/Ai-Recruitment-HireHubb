@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:major_project/providers/role_provider.dart'; // ADD THIS
 
 class ApplicationsScreen extends StatefulWidget {
   const ApplicationsScreen({super.key});
@@ -14,12 +16,15 @@ class ApplicationsScreen extends StatefulWidget {
 class _ApplicationsScreenState extends State<ApplicationsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  String _selectedFilter = 'All Jobs';
+  String _selectedStatusFilter = 'All Status';
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
     final userId = _auth.currentUser?.uid;
+    final roleProvider = Provider.of<RoleProvider>(context); // ADD THIS
 
     if (userId == null) {
       return Scaffold(
@@ -31,140 +36,525 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(
+          roleProvider.isRecruiter ? 'Manage Applications' : 'My Applications',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: theme.textTheme.bodyLarge?.color,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Text(
-                'My Applications',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: theme.textTheme.bodyLarge?.color,
+              if (!roleProvider.isRecruiter) ...[
+                // Header for Job Seeker
+                Text(
+                  'Track your job applications and interview progress',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Track your job applications and interview progress',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
-                ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // Statistics Row - Real-time
-              StreamBuilder<QuerySnapshot>(
-                stream: _firestore
-                    .collection('applications')
-                    .where('userId', isEqualTo: userId)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Text('Error loading statistics');
-                  }
-
-                  final applications = snapshot.data?.docs ?? [];
-                  return _buildStatisticsRow(applications, isDarkMode);
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Applications List - Real-time
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
+                // Statistics Row - Real-time (Job Seeker only)
+                StreamBuilder<QuerySnapshot>(
                   stream: _firestore
                       .collection('applications')
                       .where('userId', isEqualTo: userId)
-                      .orderBy('appliedDate', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return Center(
-                        child: Text('Error loading applications: ${snapshot.error}'),
-                      );
+                      return Text('Error loading statistics');
                     }
 
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(
-                        child: CircularProgressIndicator(
-                          color: const Color(0xFFFF2D55),
-                        ),
-                      );
-                    }
-
-                    final allApplications = snapshot.data?.docs ?? [];
-
-                    if (allApplications.isEmpty) {
-                      return _buildEmptyState(isDarkMode);
-                    }
-
-                    // Separate active and completed applications
-                    final activeApplications = allApplications.where((doc) {
-                      final status = doc['status'] as String?;
-                      return status != 'completed';
-                    }).toList();
-
-                    final completedApplications = allApplications.where((doc) {
-                      final status = doc['status'] as String?;
-                      return status == 'completed';
-                    }).toList();
-
-                    return ListView(
-                      children: [
-                        // Active Applications Section
-                        if (activeApplications.isNotEmpty) ...[
-                          Text(
-                            'Active Applications',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: theme.textTheme.bodyLarge?.color,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ...activeApplications.map((doc) {
-                            final application = Application.fromFirestore(doc);
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _buildApplicationCard(application, isDarkMode, theme),
-                            );
-                          }).toList(),
-                        ],
-
-                        // Completed Applications Section
-                        if (completedApplications.isNotEmpty) ...[
-                          const SizedBox(height: 20),
-                          Text(
-                            'Completed Applications',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: theme.textTheme.bodyLarge?.color,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ...completedApplications.map((doc) {
-                            final application = Application.fromFirestore(doc);
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _buildApplicationCard(application, isDarkMode, theme),
-                            );
-                          }).toList(),
-                        ],
-                      ],
-                    );
+                    final applications = snapshot.data?.docs ?? [];
+                    return _buildStatisticsRow(applications, isDarkMode);
                   },
                 ),
+                const SizedBox(height: 20),
+              ],
+
+              // Filters for Recruiter
+              if (roleProvider.isRecruiter) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedFilter,
+                        items: ['All Jobs', 'Active Jobs', 'Closed Jobs']
+                            .map((job) => DropdownMenuItem(
+                          value: job,
+                          child: Text(job),
+                        ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedFilter = value!;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Filter by Job',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedStatusFilter,
+                        items: [
+                          'All Status',
+                          'Pending',
+                          'Reviewed',
+                          'Rejected',
+                          'Hired'
+                        ]
+                            .map((status) => DropdownMenuItem(
+                          value: status,
+                          child: Text(status),
+                        ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedStatusFilter = value!;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Filter by Status',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // Applications List - Real-time
+              Expanded(
+                child: roleProvider.isRecruiter
+                    ? _buildRecruiterApplications(isDarkMode, theme)
+                    : _buildJobSeekerApplications(isDarkMode, theme),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildRecruiterApplications(bool isDarkMode, ThemeData theme) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('applications')
+          .where('recruiterId', isEqualTo: _auth.currentUser?.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Error loading applications: ${snapshot.error}'),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: CircularProgressIndicator(
+              color: const Color(0xFFFF2D55),
+            ),
+          );
+        }
+
+        final applications = snapshot.data?.docs ?? [];
+
+        if (applications.isEmpty) {
+          return _buildEmptyStateForRecruiter(isDarkMode);
+        }
+
+        return ListView.builder(
+          itemCount: applications.length,
+          itemBuilder: (context, index) {
+            final doc = applications[index];
+            final application = Application.fromFirestore(doc);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildRecruiterApplicationCard(
+                  application, isDarkMode, theme),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildJobSeekerApplications(bool isDarkMode, ThemeData theme) {
+    final userId = _auth.currentUser?.uid;
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('applications')
+          .where('userId', isEqualTo: userId)
+          .orderBy('appliedDate', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Error loading applications: ${snapshot.error}'),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: CircularProgressIndicator(
+              color: const Color(0xFFFF2D55),
+            ),
+          );
+        }
+
+        final allApplications = snapshot.data?.docs ?? [];
+
+        if (allApplications.isEmpty) {
+          return _buildEmptyState(isDarkMode);
+        }
+
+        // Separate active and completed applications
+        final activeApplications = allApplications.where((doc) {
+          final status = doc['status'] as String?;
+          return status != 'completed' && status != 'rejected';
+        }).toList();
+
+        final completedApplications = allApplications.where((doc) {
+          final status = doc['status'] as String?;
+          return status == 'completed' || status == 'rejected';
+        }).toList();
+
+        return ListView(
+          children: [
+            // Active Applications Section
+            if (activeApplications.isNotEmpty) ...[
+              Text(
+                'Active Applications',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: theme.textTheme.bodyLarge?.color,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...activeApplications.map((doc) {
+                final application = Application.fromFirestore(doc);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildApplicationCard(application, isDarkMode, theme),
+                );
+              }).toList(),
+            ],
+
+            // Completed Applications Section
+            if (completedApplications.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Text(
+                'Completed Applications',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: theme.textTheme.bodyLarge?.color,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...completedApplications.map((doc) {
+                final application = Application.fromFirestore(doc);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildApplicationCard(application, isDarkMode, theme),
+                );
+              }).toList(),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildRecruiterApplicationCard(
+      Application application, bool isDarkMode, ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with Job Seeker Info
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF007AFF).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.person,
+                      color: const Color(0xFF007AFF),
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        application.jobSeekerName ?? 'Applicant',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: theme.textTheme.bodyLarge?.color,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'Applied for: ${application.jobTitle}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                _buildStatusChip(application.status, isDarkMode),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Company and Job Info
+            Row(
+              children: [
+                Icon(
+                  Icons.business,
+                  size: 16,
+                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  application.company,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 14,
+                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  DateFormat('MMM dd, yyyy').format(application.appliedDate),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Actions for Recruiter
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      // View application details
+                      _viewApplicationDetails(application);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF007AFF),
+                      side: const BorderSide(color: Color(0xFF007AFF)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.remove_red_eye, size: 16),
+                        const SizedBox(width: 8),
+                        Text('View Details'),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // Update application status
+                      _updateApplicationStatus(application);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF2D55),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.edit, size: 16),
+                        const SizedBox(width: 8),
+                        Text('Update Status'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(ApplicationStatus status, bool isDarkMode) {
+    Color backgroundColor;
+    Color textColor;
+    String text;
+
+    switch (status) {
+      case ApplicationStatus.applied:
+        backgroundColor = const Color(0xFFFFB800).withOpacity(0.1);
+        textColor = const Color(0xFFFFB800);
+        text = 'Pending';
+        break;
+      case ApplicationStatus.inProcess:
+        backgroundColor = const Color(0xFF007AFF).withOpacity(0.1);
+        textColor = const Color(0xFF007AFF);
+        text = 'In Review';
+        break;
+      case ApplicationStatus.completed:
+        backgroundColor = const Color(0xFF34C759).withOpacity(0.1);
+        textColor = const Color(0xFF34C759);
+        text = 'Hired';
+        break;
+      case ApplicationStatus.rejected:
+        backgroundColor = const Color(0xFFFF3B30).withOpacity(0.1);
+        textColor = const Color(0xFFFF3B30);
+        text = 'Rejected';
+        break;
+    }
+
+    return Chip(
+      label: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
+      ),
+      backgroundColor: backgroundColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+
+  void _viewApplicationDetails(Application application) {
+    // TODO: Implement view application details
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Application Details'),
+        content: Text('Details for ${application.jobSeekerName}'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _updateApplicationStatus(Application application) {
+    // TODO: Implement update application status
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Update Status'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...ApplicationStatus.values.map((status) {
+              return ListTile(
+                title: Text(_getStatusText(status)),
+                onTap: () {
+                  // Update status in Firestore
+                  _firestore.collection('applications').doc(application.id).update({
+                    'status': status.name,
+                  });
+                  Navigator.pop(context);
+                },
+              );
+            }).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getStatusText(ApplicationStatus status) {
+    switch (status) {
+      case ApplicationStatus.applied:
+        return 'Pending';
+      case ApplicationStatus.inProcess:
+        return 'In Review';
+      case ApplicationStatus.completed:
+        return 'Hired';
+      case ApplicationStatus.rejected:
+        return 'Rejected';
+    }
   }
 
   Widget _buildStatisticsRow(List<QueryDocumentSnapshot> applications, bool isDarkMode) {
@@ -691,6 +1081,39 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
       ),
     );
   }
+
+  Widget _buildEmptyStateForRecruiter(bool isDarkMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.people_outline,
+            size: 80,
+            color: const Color(0xFF007AFF).withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Applications Received',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Applicants will appear here when they apply to your job posts',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // Data Models with Firestore Support
@@ -707,6 +1130,9 @@ class Application {
   final String currentStage;
   final String nextRound;
   final List<InterviewRound> rounds;
+  final String userId;
+  final String? recruiterId; // ADD THIS
+  final String? jobSeekerName; // ADD THIS for recruiter view
 
   Application({
     required this.id,
@@ -718,6 +1144,9 @@ class Application {
     required this.currentStage,
     required this.nextRound,
     required this.rounds,
+    required this.userId,
+    this.recruiterId, // ADD THIS
+    this.jobSeekerName, // ADD THIS
   });
 
   // Convert Firestore document to Application object
@@ -736,6 +1165,9 @@ class Application {
       rounds: (data['rounds'] as List<dynamic>?)
           ?.map((round) => InterviewRound.fromMap(round as Map<String, dynamic>))
           .toList() ?? [],
+      userId: data['userId'] ?? '',
+      recruiterId: data['recruiterId'] as String?, // ADD THIS
+      jobSeekerName: data['jobSeekerName'] as String?, // ADD THIS
     );
   }
 
@@ -765,6 +1197,9 @@ class Application {
       'currentStage': currentStage,
       'nextRound': nextRound,
       'rounds': rounds.map((round) => round.toMap()).toList(),
+      'userId': userId,
+      if (recruiterId != null) 'recruiterId': recruiterId, // ADD THIS
+      if (jobSeekerName != null) 'jobSeekerName': jobSeekerName, // ADD THIS
     };
   }
 }
