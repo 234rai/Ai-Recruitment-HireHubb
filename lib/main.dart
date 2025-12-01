@@ -6,12 +6,14 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'services/realtime_database_service.dart';
-import 'services/notification_service.dart'; // Import notification service
+import 'services/notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/notification_manager_service.dart';
+
 // Import theme
 import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
+import 'providers/role_provider.dart'; // ADD THIS
 
 // Import screens
 import 'screens/home/home_screen.dart';
@@ -77,8 +79,12 @@ void main() async {
   }
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    // UPDATED: Add both providers
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => RoleProvider()), // ADD THIS
+      ],
       child: const MyApp(),
     ),
   );
