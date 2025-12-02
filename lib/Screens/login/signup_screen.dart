@@ -3,6 +3,8 @@ import 'login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/user_service.dart'; // ADD THIS
 import '../../models/user_role.dart'; // ADD THIS
+import 'package:provider/provider.dart';
+import '../../providers/role_provider.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -101,6 +103,11 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
         print('✅ User created: ${userCredential.user!.uid} as ${role.displayName}');
 
         if (mounted) {
+          final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+          await roleProvider.refreshUser();
+
+          print('📝 Signup: Role refreshed - ${roleProvider.userRole?.displayName}');
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Account created successfully as ${role.displayName}!'),

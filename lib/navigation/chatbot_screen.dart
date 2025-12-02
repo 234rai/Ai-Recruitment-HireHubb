@@ -140,7 +140,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final botResponse = data['response'] ?? 'Sorry, I couldn\'t understand that.';
+        final botResponse = data['reply'] ?? 'Sorry, I couldn\'t understand that.'; // ✅ Changed from 'response' to 'reply'
         _addMessage(botResponse, isUser: false);
       } else {
         _addMessage('Error: Unable to get response. Please try again.', isUser: false);

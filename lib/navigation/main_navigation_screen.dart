@@ -32,6 +32,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       curve: Curves.easeInOut,
     );
     _animationController.forward();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+      print('🏠 MainNavigationScreen initialized:');
+      print('   - Role: ${roleProvider.userRole?.displayName}');
+      print('   - isRecruiter: ${roleProvider.isRecruiter}');
+      print('   - isJobSeeker: ${roleProvider.isJobSeeker}');
+    });
   }
 
   @override

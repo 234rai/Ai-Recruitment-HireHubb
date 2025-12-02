@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/google_auth_service.dart';
 import '../../navigation/main_navigation_screen.dart';
 import 'forgot_password_screen.dart';
+import 'package:major_project/providers/role_provider.dart';
+import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -62,6 +64,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 
   // Email/Password Login (Your original logic - unchanged)
+  // Email/Password Login
   void _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -76,8 +79,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
         print('Login successful: ${userCredential.user!.email}');
 
-        // In the _login method, replace the TODO comment:
         if (mounted) {
+          // ⭐ CRITICAL: Refresh role before navigation (ONLY ONCE)
+          final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+          await roleProvider.refreshUser();
+
+          print('🔐 Login: Role refreshed - ${roleProvider.userRole?.displayName}');
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Login successful!'),
@@ -85,10 +93,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             ),
           );
 
-          // REPLACE THIS TODO:
-          // Navigator.pushReplacementNamed(context, '/home');
-
-          // WITH THIS:
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
@@ -122,8 +126,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       }
     }
   }
-
-  // Replace the _signInWithGoogle method in home_screen.dart:
 
   Future<void> _signInWithGoogle() async {
     setState(() {
@@ -164,12 +166,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           );
         }
 
+        // ⭐ CRITICAL: Refresh role before navigation
+        final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+        await roleProvider.refreshUser();
+
+        print('🔐 Google Sign-in: Role refreshed - ${roleProvider.userRole?.displayName}');
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Google sign-in successful!'),
             backgroundColor: Color(0xFFFF2D55),
           ),
         );
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const MainNavigationScreen()),

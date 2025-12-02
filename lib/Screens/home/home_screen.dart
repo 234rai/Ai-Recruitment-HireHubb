@@ -5,6 +5,7 @@ import '../login/signup_screen.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/google_auth_service.dart';
 import '/navigation/main_navigation_screen.dart';
+import 'package:major_project/providers/role_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -99,6 +100,11 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: Color(0xFFFF2D55),
           ),
         );
+        final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+        await roleProvider.refreshUser();
+
+        print('🔐 Google Sign-in: Role refreshed - ${roleProvider.userRole?.displayName}');
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
