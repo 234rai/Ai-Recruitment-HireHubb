@@ -6,6 +6,7 @@ import 'home_screen.dart';
 import 'explore_screen.dart';
 import 'application_screen.dart';
 import 'notification_screen.dart';
+import 'messaging/conversations_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -169,21 +170,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   // JOB SEEKER SCREENS
   List<Widget> _getJobSeekerScreens() {
-    return const [
+    return [
       HomeScreen(), // Job Feed
       ExploreScreen(), // Explore Jobs
       ApplicationsScreen(), // My Applications
       NotificationsScreen(), // Notifications
+      ConversationsScreen(), // NEW: Messages
     ];
   }
 
   // RECRUITER SCREENS
   List<Widget> _getRecruiterScreens() {
-    return const [
-      HomeScreen(), // Dashboard (will show recruiter view)
+    return [
+      HomeScreen(), // Dashboard
       ExploreScreen(), // Find Candidates
-      ApplicationsScreen(), // Manage Applications (will show recruiter view)
+      ApplicationsScreen(), // Manage Applications
       NotificationsScreen(), // Notifications
+      ConversationsScreen(), // NEW: Messages
     ];
   }
 
@@ -219,6 +222,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         isDarkMode: isDarkMode,
         showBadge: true,
       ),
+      _buildNavItem( // NEW: Messages tab
+        icon: Icons.message_outlined,
+        selectedIcon: Icons.message,
+        label: 'Messages',
+        index: 4,
+        isDarkMode: isDarkMode,
+        showBadge: true, // Will show badge for unread messages
+      ),
     ];
   }
 
@@ -245,7 +256,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         label: 'Applications',
         index: 2,
         isDarkMode: isDarkMode,
-        showBadge: true, // Show badge for new applications
+        showBadge: true,
       ),
       _buildNavItem(
         icon: Icons.notifications_none_sharp,
@@ -254,6 +265,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         index: 3,
         isDarkMode: isDarkMode,
         showBadge: true,
+      ),
+      _buildNavItem( // NEW: Messages tab
+        icon: Icons.message_outlined,
+        selectedIcon: Icons.message,
+        label: 'Messages',
+        index: 4,
+        isDarkMode: isDarkMode,
+        showBadge: true, // Will show badge for unread messages
       ),
     ];
   }

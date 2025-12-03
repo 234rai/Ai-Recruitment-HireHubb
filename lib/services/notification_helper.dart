@@ -1,6 +1,7 @@
 // lib/services/notification_helper.dart - NEW FILE
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart'; // Add this import if not already present
 
 class NotificationHelper {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -127,7 +128,7 @@ class NotificationHelper {
   static Future<void> sendMessageNotification({
     required String recipientId,
     required String senderName,
-    required String messagePreview,
+    required String messagePreview, // ✅ This should be 'messagePreview' not 'message'
     required String conversationId,
     String? senderId,
   }) async {
@@ -141,6 +142,35 @@ class NotificationHelper {
         'conversationId': conversationId,
         'senderId': senderId,
         'senderName': senderName,
+      },
+    );
+  }
+
+  /// Send interview notification (when recruiter schedules interview)
+  static Future<void> sendInterviewNotification({
+    required String applicantId,
+    required String jobTitle,
+    required String company,
+    required DateTime interviewDate,
+    required String interviewType,
+    required String interviewLink,
+    required String jobId,
+  }) async {
+    final formattedDate = DateFormat('MMMM dd, yyyy - hh:mm a').format(interviewDate);
+
+    await sendNotification(
+      userId: applicantId,
+      type: 'interview_scheduled',
+      title: '🎉 Interview Scheduled!',
+      body: 'You have a $interviewType interview for $jobTitle at $company on $formattedDate',
+      jobId: jobId,
+      company: company,
+      recipientType: 'job_seeker',
+      additionalData: {
+        'interviewDate': interviewDate.toIso8601String(),
+        'interviewType': interviewType,
+        'interviewLink': interviewLink,
+        'jobTitle': jobTitle,
       },
     );
   }

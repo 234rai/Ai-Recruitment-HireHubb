@@ -2,10 +2,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'notification_helper.dart'; // 🚀 IMPORT THIS
+import 'messaging_service.dart';
+// import 'interview_service.dart'; // ✅ REMOVE THIS IF NOT USED
 
 class ApplicationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final MessagingService _messagingService = MessagingService(); // ADD THIS
+  // final InterviewService _interviewService = InterviewService(); // ✅ REMOVE IF NOT USED
 
   // 🚀 UPDATED: Now takes recruiterId and sends notification
   Future<bool> applyForJob({
@@ -72,13 +76,25 @@ class ApplicationService {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // Add to Firestore
-      await _firestore.collection('applications').add(applicationData);
+      // ✅ FIXED: Save application and get the document reference
+      final applicationDocRef = await _firestore.collection('applications').add(applicationData);
+      final applicationId = applicationDocRef.id;
 
       // Update job document to increment application count
       await _firestore.collection('jobs').doc(jobId).update({
         'applicationsCount': FieldValue.increment(1),
       });
+
+      // ✅ FIXED: Create conversation after saving the application
+      final conversationId = await _messagingService.getOrCreateConversation(
+        jobSeekerId: userId,
+        recruiterId: recruiterId,
+        jobId: jobId,
+        jobTitle: jobTitle,
+        applicationId: applicationId, // ✅ NOW USING THE ACTUAL APPLICATION ID
+      );
+
+      print('✅ Conversation created: $conversationId');
 
       // 🚀 SEND NOTIFICATION TO RECRUITER
       await NotificationHelper.sendApplicationNotification(
