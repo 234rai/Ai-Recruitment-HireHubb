@@ -121,6 +121,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         jobTitle: job.position,
         company: job.company,
         companyLogo: job.logo,
+        recruiterId: job.recruiterId ?? '', // Pass recruiterId from job object
         interviewRounds: null, // Will use default rounds
       );
 

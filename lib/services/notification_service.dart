@@ -272,7 +272,7 @@ class NotificationService {
     print('✅ Local notification displayed');
   }
 
-  // Save notification to Firestore
+  // REPLACE THE ENTIRE _saveNotificationToFirestore METHOD WITH THIS:
   Future<void> _saveNotificationToFirestore(RemoteMessage message) async {
     try {
       final user = _auth.currentUser;
@@ -281,11 +281,9 @@ class NotificationService {
         return;
       }
 
-      await _firestore
-          .collection('notifications')
-          .doc(user.uid)
-          .collection('user_notifications')
-          .add({
+      final notificationData = {
+        'userId': user.uid,
+        'recipientId': user.uid,
         'title': message.notification?.title ?? 'Job Update',
         'body': message.notification?.body ?? '',
         'timestamp': FieldValue.serverTimestamp(),
@@ -293,10 +291,17 @@ class NotificationService {
         'isRead': false,
         'jobId': message.data['jobId'],
         'company': message.data['company'] ?? '',
+        'recipientType': message.data['recipientType'] ?? 'general',
         'data': message.data,
-      });
+        'createdAt': FieldValue.serverTimestamp(),
+      };
 
-      print('✅ Notification saved to Firestore');
+      // ✅ SAVE TO TOP-LEVEL COLLECTION (not subcollection)
+      await _firestore
+          .collection('notifications')
+          .add(notificationData);
+
+      print('✅ Notification saved to Firestore (top-level)');
     } catch (e) {
       print('❌ Error saving notification to Firestore: $e');
     }

@@ -6,7 +6,6 @@ class NotificationHelper {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  /// Send notification to a user
   static Future<bool> sendNotification({
     required String userId,
     required String type,
@@ -21,6 +20,8 @@ class NotificationHelper {
       final currentUser = _auth.currentUser;
 
       final notificationData = {
+        'userId': userId, // ✅ RECIPIENT'S USER ID
+        'recipientId': userId,
         'title': title,
         'body': body,
         'timestamp': FieldValue.serverTimestamp(),
@@ -32,13 +33,12 @@ class NotificationHelper {
         'senderId': currentUser?.uid,
         'senderName': currentUser?.displayName ?? 'HireHubb',
         'data': additionalData ?? {},
+        'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Save to Firestore
+      // ✅ SAVE TO TOP-LEVEL COLLECTION
       await _firestore
           .collection('notifications')
-          .doc(userId)
-          .collection('user_notifications')
           .add(notificationData);
 
       print('✅ Notification sent to user: $userId');
