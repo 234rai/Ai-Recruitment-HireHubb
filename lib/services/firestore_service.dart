@@ -17,7 +17,6 @@ class FirestoreService {
 
   // Collection references
   static CollectionReference get _jobsCollection => _firestore.collection('jobs');
-
   static CollectionReference get _usersCollection => _firestore.collection('users');
 
   // Check if user has applied to job
@@ -40,19 +39,28 @@ class FirestoreService {
     }
   }
 
-  // Get real-time job feed
+  // ============================================================================
+  // UPDATED: Get real-time job feed with recruiterId
+  // ============================================================================
   static Stream<List<Job>> getJobFeed() {
     return _jobsCollection
         .orderBy('postedAt', descending: true)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) {
-        return Job.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+        final data = doc.data() as Map<String, dynamic>;
+        // Ensure recruiterId exists, provide empty string as fallback
+        if (!data.containsKey('recruiterId')) {
+          data['recruiterId'] = '';
+        }
+        return Job.fromMap(data, doc.id);
       }).toList();
     });
   }
 
-  // Get personalized job feed based on user skills
+  // ============================================================================
+  // UPDATED: Get personalized job feed with recruiterId
+  // ============================================================================
   static Stream<List<Job>> getPersonalizedJobFeed() {
     final user = _auth.currentUser;
     if (user == null) return const Stream.empty();
@@ -67,7 +75,12 @@ class FirestoreService {
             .orderBy('postedAt', descending: true)
             .get();
         return snapshot.docs.map((doc) {
-          return Job.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+          final data = doc.data() as Map<String, dynamic>;
+          // Ensure recruiterId exists
+          if (!data.containsKey('recruiterId')) {
+            data['recruiterId'] = '';
+          }
+          return Job.fromMap(data, doc.id);
         }).toList();
       }
 
@@ -80,7 +93,12 @@ class FirestoreService {
             .orderBy('postedAt', descending: true)
             .get();
         return snapshot.docs.map((doc) {
-          return Job.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+          final data = doc.data() as Map<String, dynamic>;
+          // Ensure recruiterId exists
+          if (!data.containsKey('recruiterId')) {
+            data['recruiterId'] = '';
+          }
+          return Job.fromMap(data, doc.id);
         }).toList();
       }
 
@@ -91,7 +109,12 @@ class FirestoreService {
           .get();
 
       return querySnapshot.docs.map((doc) {
-        return Job.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+        final data = doc.data() as Map<String, dynamic>;
+        // Ensure recruiterId exists
+        if (!data.containsKey('recruiterId')) {
+          data['recruiterId'] = '';
+        }
+        return Job.fromMap(data, doc.id);
       }).toList();
     });
   }
@@ -112,7 +135,9 @@ class FirestoreService {
     });
   }
 
-  // Get saved jobs for the current user
+  // ============================================================================
+  // UPDATED: Get saved jobs with recruiterId
+  // ============================================================================
   static Stream<List<Job>> getSavedJobs() {
     final userId = _auth.currentUser?.uid;
     if (userId == null) {
@@ -133,10 +158,12 @@ class FirestoreService {
           final jobDoc = await _jobsCollection.doc(jobId).get();
 
           if (jobDoc.exists) {
-            jobs.add(Job.fromMap(
-              jobDoc.data() as Map<String, dynamic>,
-              jobDoc.id,
-            ));
+            final data = jobDoc.data() as Map<String, dynamic>;
+            // Ensure recruiterId exists
+            if (!data.containsKey('recruiterId')) {
+              data['recruiterId'] = '';
+            }
+            jobs.add(Job.fromMap(data, jobDoc.id));
           }
         } catch (e) {
           print('Error fetching job $jobId: $e');
@@ -173,10 +200,17 @@ class FirestoreService {
     return doc.exists;
   }
 
-  // Apply for job
+  // ============================================================================
+  // UPDATED: Apply for job - sends notification to recruiter
+  // ============================================================================
   static Future<void> applyForJob(String jobId) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
+
+    // Get job details to find recruiter
+    final jobDoc = await _jobsCollection.doc(jobId).get();
+    final jobData = jobDoc.data() as Map<String, dynamic>?;
+    final recruiterId = jobData?['recruiterId'] as String?;
 
     final application = {
       'jobId': jobId,
@@ -185,6 +219,7 @@ class FirestoreService {
       'status': 'pending',
       'userName': user.displayName,
       'userEmail': user.email,
+      'recruiterId': recruiterId, // Store recruiter ID
     };
 
     // Store in applications collection
@@ -198,10 +233,103 @@ class FirestoreService {
         .set({
       'appliedAt': Timestamp.now(),
       'status': 'pending',
+      'recruiterId': recruiterId,
+    });
+
+    // ============================================================================
+    // NEW: Send notification to recruiter
+    // ============================================================================
+    if (recruiterId != null && recruiterId.isNotEmpty) {
+      await sendNotificationToRecruiter(
+        recruiterId: recruiterId,
+        jobId: jobId,
+        applicantId: user.uid,
+        applicantName: user.displayName ?? 'A candidate',
+        jobTitle: jobData?['position'] ?? 'a position',
+      );
+    }
+  }
+
+  // ============================================================================
+  // NEW: Send notification to recruiter when someone applies
+  // ============================================================================
+  static Future<void> sendNotificationToRecruiter({
+    required String recruiterId,
+    required String jobId,
+    required String applicantId,
+    required String applicantName,
+    required String jobTitle,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'recipientId': recruiterId,
+        'senderId': applicantId,
+        'type': 'application',
+        'title': 'New Application',
+        'message': '$applicantName applied for $jobTitle',
+        'jobId': jobId,
+        'isRead': false,
+        'createdAt': Timestamp.now(),
+      });
+      print('✅ Notification sent to recruiter');
+    } catch (e) {
+      print('❌ Error sending notification: $e');
+    }
+  }
+
+  // ============================================================================
+  // NEW: Get notifications for current user
+  // ============================================================================
+  static Stream<List<Map<String, dynamic>>> getUserNotifications() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return Stream.value([]);
+
+    return _firestore
+        .collection('notifications')
+        .where('recipientId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return {
+          'id': doc.id,
+          ...doc.data(),
+        };
+      }).toList();
     });
   }
 
-  // Get user's applications
+  // ============================================================================
+  // NEW: Mark notification as read
+  // ============================================================================
+  static Future<void> markNotificationAsRead(String notificationId) async {
+    try {
+      await _firestore.collection('notifications').doc(notificationId).update({
+        'isRead': true,
+      });
+    } catch (e) {
+      print('Error marking notification as read: $e');
+    }
+  }
+
+  // ============================================================================
+  // NEW: Get unread notification count
+  // ============================================================================
+  static Stream<int> getUnreadNotificationCount() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return Stream.value(0);
+
+    return _firestore
+        .collection('notifications')
+        .where('recipientId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  // ============================================================================
+  // UPDATED: Get user's applications with recruiterId
+  // ============================================================================
   static Stream<List<Map<String, dynamic>>> getUserApplications() {
     final userId = _auth.currentUser?.uid;
     if (userId == null) {
@@ -223,16 +351,19 @@ class FirestoreService {
         try {
           final jobDoc = await _jobsCollection.doc(jobId).get();
           if (jobDoc.exists) {
-            final job = Job.fromMap(
-              jobDoc.data() as Map<String, dynamic>,
-              jobDoc.id,
-            );
+            final data = jobDoc.data() as Map<String, dynamic>;
+            // Ensure recruiterId exists
+            if (!data.containsKey('recruiterId')) {
+              data['recruiterId'] = '';
+            }
+            final job = Job.fromMap(data, jobDoc.id);
 
             applications.add({
               'applicationId': doc.id,
               'job': job,
               'appliedAt': appData['appliedAt'],
               'status': appData['status'] ?? 'pending',
+              'recruiterId': appData['recruiterId'],
             });
           }
         } catch (e) {
@@ -244,12 +375,19 @@ class FirestoreService {
     });
   }
 
-  // Get job by ID - FIXED: Use fromMap instead of fromFirestore
+  // ============================================================================
+  // UPDATED: Get job by ID with recruiterId
+  // ============================================================================
   static Future<Job> getJobById(String jobId) async {
     try {
       final doc = await _firestore.collection('jobs').doc(jobId).get();
       if (doc.exists) {
-        return Job.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+        final data = doc.data() as Map<String, dynamic>;
+        // Ensure recruiterId exists
+        if (!data.containsKey('recruiterId')) {
+          data['recruiterId'] = '';
+        }
+        return Job.fromMap(data, doc.id);
       }
       throw Exception('Job not found');
     } catch (e) {
@@ -258,8 +396,14 @@ class FirestoreService {
     }
   }
 
-  // Add sample jobs to Firestore (run once)
+  // ============================================================================
+  // UPDATED: Add sample jobs with recruiterId
+  // ============================================================================
   static Future<void> addSampleJobs() async {
+    // Get current user as recruiter (or use a default recruiter ID)
+    final currentUser = _auth.currentUser;
+    final recruiterId = currentUser?.uid ?? 'sample_recruiter_id';
+
     final sampleJobs = [
       {
         'company': 'Google',
@@ -284,6 +428,7 @@ class FirestoreService {
         'companyDescription': 'Google is a global technology company focused on search engine technology, cloud computing, and advertising.',
         'postedAt': Timestamp.now(),
         'searchKeywords': ['google', 'product manager', 'remote', 'senior', 'agile', 'leadership'],
+        'recruiterId': recruiterId, // ADD recruiterId
       },
       {
         'company': 'Microsoft',
@@ -308,6 +453,7 @@ class FirestoreService {
         'companyDescription': 'Microsoft is a leading technology company that develops, licenses, and supports software, services, and devices.',
         'postedAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(hours: 5))),
         'searchKeywords': ['microsoft', 'software engineer', 'c#', '.net', 'azure', 'hybrid'],
+        'recruiterId': recruiterId, // ADD recruiterId
       },
       {
         'company': 'Apple',
@@ -332,6 +478,7 @@ class FirestoreService {
         'companyDescription': 'Apple is a multinational technology company that designs, develops, and sells consumer electronics and software.',
         'postedAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 1))),
         'searchKeywords': ['apple', 'ux designer', 'ui/ux', 'figma', 'remote', 'design'],
+        'recruiterId': recruiterId, // ADD recruiterId
       },
       {
         'company': 'Amazon',
@@ -356,6 +503,7 @@ class FirestoreService {
         'companyDescription': 'Amazon is a multinational technology company focusing on e-commerce, cloud computing, and artificial intelligence.',
         'postedAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 3))),
         'searchKeywords': ['amazon', 'frontend', 'react', 'typescript', 'remote', 'developer'],
+        'recruiterId': recruiterId, // ADD recruiterId
       },
       {
         'company': 'Meta',
@@ -380,6 +528,7 @@ class FirestoreService {
         'companyDescription': 'Meta builds technologies that help people connect, find communities, and grow businesses.',
         'postedAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7))),
         'searchKeywords': ['meta', 'data scientist', 'python', 'machine learning', 'sql', 'hybrid'],
+        'recruiterId': recruiterId, // ADD recruiterId
       },
     ];
 
@@ -387,7 +536,7 @@ class FirestoreService {
       await _jobsCollection.add(job);
     }
 
-    print('✅ Sample jobs added successfully!');
+    print('✅ Sample jobs added successfully with recruiterId!');
   }
 
   // Update user profile
@@ -405,5 +554,21 @@ class FirestoreService {
 
     final doc = await _usersCollection.doc(user.uid).get();
     return doc.data() as Map<String, dynamic>?;
+  }
+
+  // ============================================================================
+  // NEW: Get recruiter details
+  // ============================================================================
+  static Future<Map<String, dynamic>?> getRecruiterProfile(String recruiterId) async {
+    try {
+      final doc = await _usersCollection.doc(recruiterId).get();
+      if (doc.exists) {
+        return doc.data() as Map<String, dynamic>?;
+      }
+      return null;
+    } catch (e) {
+      print('Error getting recruiter profile: $e');
+      return null;
+    }
   }
 }

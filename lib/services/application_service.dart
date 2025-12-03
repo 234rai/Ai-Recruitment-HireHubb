@@ -1,21 +1,25 @@
-// lib/services/application_service.dart
+// lib/services/application_service.dart - UPDATED WITH NOTIFICATIONS
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'notification_helper.dart'; // 🚀 IMPORT THIS
 
 class ApplicationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Call this method when user clicks "Apply" button on a job
+  // 🚀 UPDATED: Now takes recruiterId and sends notification
   Future<bool> applyForJob({
     required String jobId,
     required String jobTitle,
     required String company,
+    required String recruiterId, // 🚀 NEW PARAMETER
     String companyLogo = '🏢',
     List<String>? interviewRounds,
   }) async {
     try {
       final userId = _auth.currentUser?.uid;
+      final userName = _auth.currentUser?.displayName ?? 'Anonymous';
+
       if (userId == null) {
         throw Exception('User not authenticated');
       }
@@ -53,10 +57,12 @@ class ApplicationService {
       // Create application document
       final applicationData = {
         'userId': userId,
+        'userName': userName, // 🚀 NEW
         'jobId': jobId,
         'jobTitle': jobTitle,
         'company': company,
         'companyLogo': companyLogo,
+        'recruiterId': recruiterId, // 🚀 NEW - CRITICAL FOR NOTIFICATIONS
         'appliedDate': Timestamp.fromDate(DateTime.now()),
         'status': 'applied',
         'currentStage': rounds.first,
@@ -74,6 +80,17 @@ class ApplicationService {
         'applicationsCount': FieldValue.increment(1),
       });
 
+      // 🚀 SEND NOTIFICATION TO RECRUITER
+      await NotificationHelper.sendApplicationNotification(
+        recruiterId: recruiterId,
+        applicantId: userId,
+        applicantName: userName,
+        jobTitle: jobTitle,
+        company: company,
+        jobId: jobId,
+      );
+
+      print('✅ Application submitted and recruiter notified');
       return true;
     } catch (e) {
       print('Error applying for job: $e');
@@ -81,16 +98,34 @@ class ApplicationService {
     }
   }
 
-  // Update application status
+  // 🚀 UPDATED: Now sends notification when status changes
   Future<void> updateApplicationStatus({
     required String applicationId,
     required String status,
   }) async {
     try {
+      // Get application data first
+      final appDoc = await _firestore.collection('applications').doc(applicationId).get();
+      final appData = appDoc.data();
+
+      if (appData == null) return;
+
+      // Update status
       await _firestore.collection('applications').doc(applicationId).update({
         'status': status,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // 🚀 SEND NOTIFICATION TO APPLICANT
+      await NotificationHelper.sendStatusUpdateNotification(
+        applicantId: appData['userId'],
+        status: status,
+        jobTitle: appData['jobTitle'],
+        company: appData['company'],
+        jobId: appData['jobId'],
+      );
+
+      print('✅ Status updated and applicant notified');
     } catch (e) {
       print('Error updating application status: $e');
     }
@@ -180,6 +215,16 @@ class ApplicationService {
             'status': 'inProcess',
             'updatedAt': FieldValue.serverTimestamp(),
           });
+
+          // 🚀 SEND NOTIFICATION TO APPLICANT
+          await NotificationHelper.sendStatusUpdateNotification(
+            applicantId: data['userId'],
+            status: 'inProcess',
+            jobTitle: data['jobTitle'],
+            company: data['company'],
+            jobId: data['jobId'],
+          );
+
         } else {
           // All rounds completed
           await _firestore.collection('applications').doc(applicationId).update({
@@ -188,6 +233,15 @@ class ApplicationService {
             'nextRound': 'None',
             'updatedAt': FieldValue.serverTimestamp(),
           });
+
+          // 🚀 SEND NOTIFICATION TO APPLICANT
+          await NotificationHelper.sendStatusUpdateNotification(
+            applicantId: data['userId'],
+            status: 'completed',
+            jobTitle: data['jobTitle'],
+            company: data['company'],
+            jobId: data['jobId'],
+          );
         }
       }
     } catch (e) {

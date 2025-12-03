@@ -13,7 +13,7 @@ import 'services/notification_manager_service.dart';
 // Import theme
 import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
-import 'providers/role_provider.dart'; // ADD THIS
+import 'providers/role_provider.dart';
 
 // Import screens
 import 'screens/home/home_screen.dart';
@@ -21,6 +21,8 @@ import 'screens/login/login_screen.dart';
 import 'screens/login/signup_screen.dart';
 import 'navigation/drawer_navigation/profile_screen.dart';
 import 'navigation/main_navigation_screen.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,11 +81,12 @@ void main() async {
   }
 
   runApp(
-    // UPDATED: Add both providers
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => RoleProvider()), // ADD THIS
+        ChangeNotifierProvider(
+          create: (_) => RoleProvider(), // RoleProvider will auto-initialize
+        ),
       ],
       child: const MyApp(),
     ),
@@ -98,6 +101,7 @@ class MyApp extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
+          navigatorKey: navigatorKey, // 🚀 ADD THIS LINE
           title: 'HireHubb',
           debugShowCheckedModeBanner: false,
           themeMode: themeProvider.themeMode,
@@ -105,7 +109,7 @@ class MyApp extends StatelessWidget {
           darkTheme: AppTheme.darkTheme,
           initialRoute: '/',
           routes: {
-            '/': (context) => const AuthWrapper(),
+            '/': (context) => const AppLifecycleWrapper(),
             '/welcome': (context) => const HomeScreen(),
             '/login': (context) => const LoginScreen(),
             '/signup': (context) => const SignUpScreen(),
@@ -118,15 +122,67 @@ class MyApp extends StatelessWidget {
   }
 }
 
+class AppLifecycleWrapper extends StatefulWidget {
+  const AppLifecycleWrapper({super.key});
+
+  @override
+  State<AppLifecycleWrapper> createState() => _AppLifecycleWrapperState();
+}
+
+class _AppLifecycleWrapperState extends State<AppLifecycleWrapper> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    print('📱 AppLifecycleWrapper: State changed to $state');
+
+    if (state == AppLifecycleState.resumed) {
+      // CRITICAL FIX: More aggressive refresh with longer delay
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+
+        print('🔄 App resumed - forcing role refresh...');
+        await Future.delayed(const Duration(milliseconds: 800)); // Longer delay
+
+        if (mounted) {
+          final roleProvider = context.read<RoleProvider>();
+          await roleProvider.forceRefresh();
+          print('✅ Role force refreshed after app resume');
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const AuthWrapper();
+  }
+}
+
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
   @override
   Widget build(BuildContext context) {
+    print('🔍 AuthWrapper: Building...');
+
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+      builder: (context, authSnapshot) {
+        print('🔍 AuthWrapper: Auth state - ${authSnapshot.connectionState}');
+
+        // Show loading while checking auth
+        if (authSnapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Colors.white,
             body: Center(
@@ -149,7 +205,8 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasError) {
+        if (authSnapshot.hasError) {
+          print('❌ AuthWrapper: Error - ${authSnapshot.error}');
           return Scaffold(
             backgroundColor: Colors.white,
             body: Center(
@@ -159,7 +216,7 @@ class AuthWrapper extends StatelessWidget {
                   const Icon(Icons.error_outline, color: Colors.red, size: 64),
                   const SizedBox(height: 16),
                   Text(
-                    'Error: ${snapshot.error}',
+                    'Error: ${authSnapshot.error}',
                     style: const TextStyle(color: Colors.red, fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
@@ -190,10 +247,67 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasData && snapshot.data != null) {
-          return const MainNavigationScreen();
+        // User is authenticated
+        if (authSnapshot.hasData && authSnapshot.data != null) {
+          print('✅ AuthWrapper: User authenticated - ${authSnapshot.data!.uid}');
+
+          // CRITICAL FIX: Use Consumer instead of just reading once
+          return Consumer<RoleProvider>(
+            builder: (context, roleProvider, child) {
+              print('🔍 AuthWrapper: RoleProvider state:');
+              print('   - isLoading: ${roleProvider.isLoading}');
+              print('   - userRole: ${roleProvider.userRole?.displayName}');
+              print('   - isRecruiter: ${roleProvider.isRecruiter}');
+
+              // Show loading while role is being fetched
+              if (roleProvider.isLoading) {
+                return const Scaffold(
+                  backgroundColor: Colors.white,
+                  body: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(color: Color(0xFFFF2D55)),
+                        SizedBox(height: 16),
+                        Text(
+                          'Loading your profile...',
+                          style: TextStyle(
+                            color: Color(0xFFFF2D55),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              // CRITICAL: Check if role is actually loaded
+              if (roleProvider.currentUser == null) {
+                print('⚠️ Role loaded but user is null, refreshing...');
+                // Trigger a refresh if user is null
+                Future.delayed(Duration.zero, () {
+                  roleProvider.forceRefresh();
+                });
+
+                return const Scaffold(
+                  backgroundColor: Colors.white,
+                  body: Center(
+                    child: CircularProgressIndicator(color: Color(0xFFFF2D55)),
+                  ),
+                );
+              }
+
+              // Role loaded successfully, show main screen
+              print('✅ AuthWrapper: Showing MainNavigationScreen for ${roleProvider.userRole?.displayName}');
+              return const MainNavigationScreen();
+            },
+          );
         }
 
+        // No user, show welcome screen
+        print('ℹ️ AuthWrapper: No user, showing HomeScreen');
         return const HomeScreen();
       },
     );

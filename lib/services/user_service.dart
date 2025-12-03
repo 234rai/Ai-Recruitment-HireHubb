@@ -11,8 +11,10 @@ class UserService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Cache for current user role to avoid multiple reads
+  // Cache for current user role with timestamp
   AppUser? _cachedUser;
+  DateTime? _cacheTimestamp;
+  static const Duration _cacheDuration = Duration(minutes: 10); // Cache for 10 minutes
 
   // ==================== USER ROLE OPERATIONS ====================
 
@@ -46,8 +48,9 @@ class UserService {
       // Save to Firestore
       await _firestore.collection('users').doc(uid).set(userData);
 
-      // Cache the user
+      // Cache the user with timestamp
       _cachedUser = appUser;
+      _cacheTimestamp = DateTime.now();
 
       print('✅ User profile created: ${role.displayName}');
     } catch (e) {
@@ -56,19 +59,24 @@ class UserService {
     }
   }
 
-  /// Get user role from Firestore
+  /// Get user role from Firestore with cache validation
   Future<UserRole?> getUserRole([String? userId]) async {
     try {
       final uid = userId ?? _auth.currentUser?.uid;
       if (uid == null) return null;
 
-      // Check cache first
-      if (_cachedUser != null && _cachedUser!.uid == uid) {
+      // Check cache validity first
+      if (_isCacheValid(uid)) {
+        print('📦 Using cached user role');
         return _cachedUser!.role;
       }
 
-      // Fetch from Firestore
-      final doc = await _firestore.collection('users').doc(uid).get();
+      // Fetch from Firestore with server source to bypass local cache
+      print('📡 Fetching fresh user role from server');
+      final doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get(GetOptions(source: Source.server));
 
       if (!doc.exists) {
         print('⚠️ User document not found for: $uid');
@@ -76,6 +84,24 @@ class UserService {
       }
 
       final role = UserRole.fromString(doc.data()?['role']);
+
+      // Create a minimal AppUser for cache
+      if (_cachedUser == null || _cachedUser!.uid != uid) {
+        _cachedUser = AppUser(
+          uid: uid,
+          email: doc.data()?['email'] ?? '',
+          displayName: doc.data()?['displayName'],
+          photoURL: doc.data()?['photoURL'],
+          role: role,
+          createdAt: doc.data()?['createdAt'] != null
+              ? DateTime.parse(doc.data()!['createdAt'])
+              : DateTime.now(),
+        );
+      } else {
+        _cachedUser = _cachedUser!.copyWith(role: role);
+      }
+
+      _cacheTimestamp = DateTime.now();
       return role;
     } catch (e) {
       print('❌ Error getting user role: $e');
@@ -83,19 +109,24 @@ class UserService {
     }
   }
 
-  /// Get full AppUser object
+  /// Get full AppUser object with cache validation
   Future<AppUser?> getAppUser([String? userId]) async {
     try {
       final uid = userId ?? _auth.currentUser?.uid;
       if (uid == null) return null;
 
-      // Check cache first
-      if (_cachedUser != null && _cachedUser!.uid == uid) {
+      // Check cache validity
+      if (_isCacheValid(uid)) {
+        print('📦 Using cached app user');
         return _cachedUser;
       }
 
-      // Fetch from Firestore
-      final doc = await _firestore.collection('users').doc(uid).get();
+      // Fetch from Firestore with server source
+      print('📡 Fetching fresh app user from server');
+      final doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get(GetOptions(source: Source.server));
 
       if (!doc.exists) {
         print('⚠️ User document not found for: $uid');
@@ -103,12 +134,35 @@ class UserService {
       }
 
       final appUser = AppUser.fromMap(doc.data()!);
-      _cachedUser = appUser; // Cache it
+
+      // Update cache with timestamp
+      _cachedUser = appUser;
+      _cacheTimestamp = DateTime.now();
+
       return appUser;
     } catch (e) {
       print('❌ Error getting app user: $e');
       return null;
     }
+  }
+
+  /// Check if cache is still valid
+  bool _isCacheValid(String uid) {
+    if (_cachedUser == null || _cachedUser!.uid != uid) {
+      return false;
+    }
+
+    if (_cacheTimestamp == null) {
+      return false;
+    }
+
+    final age = DateTime.now().difference(_cacheTimestamp!);
+    if (age > _cacheDuration) {
+      print('⏰ Cache expired (${age.inMinutes}m old)');
+      return false;
+    }
+
+    return true;
   }
 
   /// Check if current user is recruiter
@@ -151,7 +205,7 @@ class UserService {
       await _firestore.collection('users').doc(uid).update(updates);
 
       // Clear cache to force refresh
-      _cachedUser = null;
+      clearCache();
 
       print('✅ User profile updated');
     } catch (e) {
@@ -188,14 +242,22 @@ class UserService {
       if (!doc.exists) return null;
       final appUser = AppUser.fromMap(doc.data()!);
       _cachedUser = appUser; // Update cache
+      _cacheTimestamp = DateTime.now();
       return appUser;
     });
   }
 
-  /// Clear cached user (call on logout)
+  /// Clear cached user (call on logout or when forcing refresh)
   void clearCache() {
     _cachedUser = null;
+    _cacheTimestamp = null;
     print('🗑️ User cache cleared');
+  }
+
+  /// Force refresh user data (bypass cache)
+  Future<AppUser?> forceRefreshUser([String? userId]) async {
+    clearCache();
+    return await getAppUser(userId);
   }
 
   /// Initialize user on app start
@@ -207,7 +269,7 @@ class UserService {
         return;
       }
 
-      // Load user into cache
+      // Load user with cache validation
       await getAppUser(currentUser.uid);
       print('✅ User initialized: ${_cachedUser?.role.displayName}');
     } catch (e) {

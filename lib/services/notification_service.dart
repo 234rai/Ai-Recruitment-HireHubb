@@ -4,6 +4,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert'; // For jsonDecode
+import 'package:major_project/main.dart'; // For navigatorKey
 
 // CRITICAL: Top-level function for background message handling
 @pragma('vm:entry-point')
@@ -182,11 +184,54 @@ class NotificationService {
   }
 
   // Handle local notification tap
+  // In notification_service.dart - REPLACE _onNotificationTapped method:
   void _onNotificationTapped(NotificationResponse response) {
     print('👆 Local notification tapped');
-    print('Payload: ${response.payload}');
+    final payload = response.payload;
 
-    // TODO: Navigate based on payload
+    if (payload == null || payload.isEmpty) {
+      // No payload, just open notifications screen
+      navigatorKey.currentState?.pushNamed('/main');
+      return;
+    }
+
+    try {
+      // Parse payload as JSON
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final type = data['type'] as String?;
+      final jobId = data['jobId'] as String?;
+
+      print('🔍 Notification type: $type, jobId: $jobId');
+
+      // Navigate based on type
+      switch (type) {
+        case 'new_application':
+        // For recruiters - go to applications screen
+          navigatorKey.currentState?.pushNamed('/main');
+          break;
+
+        case 'application_status':
+        // For job seekers - go to applications screen
+          navigatorKey.currentState?.pushNamed('/main');
+          break;
+
+        case 'message':
+          final conversationId = data['conversationId'] as String?;
+          if (conversationId != null) {
+            // TODO: Navigate to chat screen when messaging is implemented
+            navigatorKey.currentState?.pushNamed('/main');
+          }
+          break;
+
+        default:
+        // Default: go to main screen
+          navigatorKey.currentState?.pushNamed('/main');
+      }
+    } catch (e) {
+      print('❌ Error handling notification tap: $e');
+      // Fallback: just open main screen
+      navigatorKey.currentState?.pushNamed('/main');
+    }
   }
 
   // Show local notification - FIXED VERSION

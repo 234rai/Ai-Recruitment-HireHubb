@@ -1,7 +1,7 @@
-// lib/navigation/main_navigation_screen.dart
+// lib/navigation/main_navigation_screen.dart - FIXED VERSION
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // ADD THIS
-import '../providers/role_provider.dart'; // ADD THIS
+import 'package:provider/provider.dart';
+import '../providers/role_provider.dart';
 import 'home_screen.dart';
 import 'explore_screen.dart';
 import 'application_screen.dart';
@@ -15,7 +15,7 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen>
-    with SingleTickerProviderStateMixin {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   late AnimationController _animationController;
   late Animation<double> _animation;
@@ -23,6 +23,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -31,8 +33,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       parent: _animationController,
       curve: Curves.easeInOut,
     );
+
     _animationController.forward();
 
+    // Log initial role on first load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final roleProvider = Provider.of<RoleProvider>(context, listen: false);
       print('🏠 MainNavigationScreen initialized:');
@@ -43,7 +47,35 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    print('📱 MainNavigationScreen Lifecycle: $state');
+
+    if (state == AppLifecycleState.resumed) {
+      // When app comes back to foreground, force refresh and rebuild
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+
+        print('🔄 App resumed - refreshing role...');
+        final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+
+        // Force refresh the role
+        await roleProvider.forceRefresh();
+
+        // Force rebuild the entire screen
+        if (mounted) {
+          setState(() {
+            // This will trigger a rebuild with the refreshed role
+          });
+          print('✅ Role refreshed: ${roleProvider.userRole?.displayName}');
+          print('   - isRecruiter: ${roleProvider.isRecruiter}');
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
     super.dispose();
   }
@@ -60,57 +92,78 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme
-        .of(context)
-        .brightness == Brightness.dark;
-    final roleProvider = Provider.of<RoleProvider>(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // Show loading while role is being fetched
-    if (roleProvider.isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFFF2D55)),
-        ),
-      );
-    }
+    // CRITICAL FIX: Use Consumer to automatically rebuild when role changes
+    return Consumer<RoleProvider>(
+      builder: (context, roleProvider, child) {
+        print('🔄 MainNavigationScreen rebuilding...');
+        print('   - isLoading: ${roleProvider.isLoading}');
+        print('   - Role: ${roleProvider.userRole?.displayName}');
+        print('   - isRecruiter: ${roleProvider.isRecruiter}');
 
-    // ROLE-BASED SCREENS: Different screens for different roles
-    final List<Widget> screens = roleProvider.isRecruiter
-        ? _getRecruiterScreens()
-        : _getJobSeekerScreens();
-
-    return Scaffold(
-      body: FadeTransition(
-        opacity: _animation,
-        child: screens[_currentIndex],
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+        // Show loading while role is being fetched
+        if (roleProvider.isLoading) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(color: Color(0xFFFF2D55)),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Loading your dashboard...',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: roleProvider.isRecruiter
-                  ? _getRecruiterNavItems(isDarkMode)
-                  : _getJobSeekerNavItems(isDarkMode),
+          );
+        }
+
+        // ROLE-BASED SCREENS: Different screens for different roles
+        final List<Widget> screens = roleProvider.isRecruiter
+            ? _getRecruiterScreens()
+            : _getJobSeekerScreens();
+
+        print('✅ Showing ${roleProvider.isRecruiter ? "RECRUITER" : "JOB SEEKER"} screens');
+
+        return Scaffold(
+          body: FadeTransition(
+            opacity: _animation,
+            child: screens[_currentIndex],
+          ),
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, -5),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: roleProvider.isRecruiter
+                      ? _getRecruiterNavItems(isDarkMode)
+                      : _getJobSeekerNavItems(isDarkMode),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -240,8 +293,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   isSelected ? selectedIcon : icon,
                   color: isSelected
                       ? const Color(0xFFFF2D55)
-                      : (isDarkMode ? Colors.grey.shade400 : Colors.grey
-                      .shade600),
+                      : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
                   size: 24,
                 ),
                 if (showBadge && !isSelected)
@@ -275,4 +327,4 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       ),
     );
   }
-} 
+}

@@ -1,3 +1,4 @@
+// lib/models/job_model.dart - UPDATED VERSION
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Job {
@@ -20,6 +21,11 @@ class Job {
   final Timestamp postedAt;
   final List<String> searchKeywords;
 
+  // 🚀 NEW FIELD - CRITICAL FOR NOTIFICATIONS
+  final String? recruiterId;
+  final String? recruiterName;
+  final String? recruiterEmail;
+
   Job({
     required this.id,
     required this.company,
@@ -39,6 +45,9 @@ class Job {
     required this.companyDescription,
     required this.postedAt,
     required this.searchKeywords,
+    this.recruiterId,
+    this.recruiterName,
+    this.recruiterEmail,
   });
 
   factory Job.fromMap(Map<String, dynamic> data, String id) {
@@ -61,6 +70,10 @@ class Job {
       companyDescription: data['companyDescription'] ?? 'No company description available.',
       postedAt: data['postedAt'] ?? Timestamp.now(),
       searchKeywords: List<String>.from(data['searchKeywords'] ?? []),
+      // 🚀 NEW FIELDS
+      recruiterId: data['recruiterId'],
+      recruiterName: data['recruiterName'],
+      recruiterEmail: data['recruiterEmail'],
     );
   }
 
@@ -83,6 +96,10 @@ class Job {
       'companyDescription': companyDescription,
       'postedAt': postedAt,
       'searchKeywords': searchKeywords,
+      // 🚀 NEW FIELDS
+      'recruiterId': recruiterId,
+      'recruiterName': recruiterName,
+      'recruiterEmail': recruiterEmail,
     };
   }
 }
