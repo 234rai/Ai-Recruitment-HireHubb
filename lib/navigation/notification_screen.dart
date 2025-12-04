@@ -1,12 +1,14 @@
-// lib/screens/notifications/notifications_screen.dart
+// lib/navigation/notification_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:major_project/services/notification_manager_service.dart';
-import 'package:major_project/services/notification_debug_service.dart';
 import 'package:major_project/providers/role_provider.dart';
+
+// ✅ REMOVED unnecessary imports
+// import 'package:major_project/services/notification_manager_service.dart';
+// import 'package:major_project/services/notification_debug_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -19,17 +21,53 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // ✅ FIXED: Updated to use top-level collection
   Stream<QuerySnapshot>? _getNotificationsStream() {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return null;
+
+    return _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: currentUser.uid)
+        .orderBy('timestamp', descending: true)
+        .snapshots();
+  }
+
+  // ✅ NEW: Get unread notification count for badge
+  Stream<int> _getUnreadCountStream(RoleProvider roleProvider) {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      return Stream.value(0);
+    }
+
+    return _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: currentUser.uid)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) {
+      // Filter by role client-side
+      final relevantDocs = snapshot.docs.where((doc) {
+        final notification = doc.data() as Map<String, dynamic>;
+        return _isNotificationRelevantForRole(notification, roleProvider);
+      });
+      return relevantDocs.length;
+    });
+  }
+
+  // ✅ FIXED: Updated role-based stream to use top-level collection
+  Stream<QuerySnapshot>? _getRoleBasedNotificationsStream(RoleProvider roleProvider) {
     final currentUser = _auth.currentUser;
     if (currentUser == null) {
       return null;
     }
 
     try {
+      // ✅ SIMPLIFIED: Only filter by userId and orderBy timestamp
+      // Role-based filtering done client-side (see _isNotificationRelevantForRole)
       return _firestore
           .collection('notifications')
-          .doc(currentUser.uid)
-          .collection('user_notifications')
+          .where('userId', isEqualTo: currentUser.uid)
           .orderBy('timestamp', descending: true)
           .snapshots();
     } catch (e) {
@@ -38,36 +76,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  // Role-based notification filtering
-  Stream<QuerySnapshot>? _getRoleBasedNotificationsStream(RoleProvider roleProvider) {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) {
-      return null;
+  // ✅ NEW: Client-side role filtering to avoid composite index requirement
+  bool _isNotificationRelevantForRole(
+      Map<String, dynamic> notification,
+      RoleProvider roleProvider,
+      ) {
+    final recipientType = notification['recipientType'] as String?;
+
+    if (recipientType == null || recipientType == 'general') {
+      return true; // General notifications visible to all
     }
 
-    try {
-      if (roleProvider.isRecruiter) {
-        // For recruiters: filter to show only recruiter-relevant notifications
-        return _firestore
-            .collection('notifications')
-            .doc(currentUser.uid)
-            .collection('user_notifications')
-            .where('recipientType', isEqualTo: 'recruiter')
-            .orderBy('timestamp', descending: true)
-            .snapshots();
-      } else {
-        // For job seekers/students: filter to show relevant notifications
-        return _firestore
-            .collection('notifications')
-            .doc(currentUser.uid)
-            .collection('user_notifications')
-            .where('recipientType', whereIn: ['job_seeker', 'student', 'general'])
-            .orderBy('timestamp', descending: true)
-            .snapshots();
-      }
-    } catch (e) {
-      print('Error creating role-based notifications stream: $e');
-      return _getNotificationsStream(); // Fallback to original stream
+    if (roleProvider.isRecruiter) {
+      return recipientType == 'recruiter';
+    } else {
+      return ['job_seeker', 'student', 'general'].contains(recipientType);
     }
   }
 
@@ -85,13 +108,42 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ROLE-BASED HEADER
-              Text(
-                roleProvider.isRecruiter ? 'Recruiter Notifications' : 'Notifications',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
+              Row(
+                children: [
+                  Text(
+                    roleProvider.isRecruiter ? 'Recruiter Notifications' : 'Notifications',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // ✅ NEW: Unread count badge
+                  StreamBuilder<int>(
+                    stream: _getUnreadCountStream(roleProvider),
+                    builder: (context, snapshot) {
+                      final unreadCount = snapshot.data ?? 0;
+                      if (unreadCount == 0) return const SizedBox.shrink();
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: roleProvider.isRecruiter ? Colors.green : const Color(0xFFFF2D55),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Text(
@@ -108,7 +160,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               // Notifications List - USE ROLE-BASED STREAM
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
-                  stream: _getRoleBasedNotificationsStream(roleProvider) ?? _getNotificationsStream(),
+                  stream: _getRoleBasedNotificationsStream(roleProvider),
                   builder: (context, snapshot) {
                     // Handle no user case
                     if (_auth.currentUser == null) {
@@ -140,14 +192,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       return _buildEmptyState(isDarkMode, roleProvider);
                     }
 
-                    final notifications = snapshot.data!.docs;
+                    // ✅ Filter notifications client-side based on role
+                    final allNotifications = snapshot.data!.docs;
+                    final filteredNotifications = allNotifications.where((doc) {
+                      final notification = doc.data() as Map<String, dynamic>;
+                      return _isNotificationRelevantForRole(notification, roleProvider);
+                    }).toList();
+
+                    // Show empty state if no notifications after filtering
+                    if (filteredNotifications.isEmpty) {
+                      return _buildEmptyState(isDarkMode, roleProvider);
+                    }
 
                     return ListView.builder(
-                      itemCount: notifications.length,
+                      itemCount: filteredNotifications.length,
                       itemBuilder: (context, index) {
                         final notification =
-                        notifications[index].data() as Map<String, dynamic>;
-                        final notificationId = notifications[index].id;
+                        filteredNotifications[index].data() as Map<String, dynamic>;
+                        final notificationId = filteredNotifications[index].id;
 
                         return _buildNotificationCard(
                           notification,
@@ -310,7 +372,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } else {
       if (type == 'application_update') {
         actionButtonText = 'View Application';
-      } else if (type == 'interview_invite') {
+      } else if (type == 'interview_scheduled') {
         actionButtonText = 'Schedule Interview';
       }
     }
@@ -578,205 +640,49 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             const SizedBox(height: 30),
 
-            // Debug Section - SAME FOR BOTH ROLES
-            Container(
+            // ✅ SIMPLIFIED: Removed debug section since we're removing those services
+            // Add a simple button to test notifications if needed
+            SizedBox(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'Debug Tools',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.white : Colors.black,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final currentUser = _auth.currentUser;
+                  if (currentUser == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please log in to test notifications'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Simple test notification
+                  await _createTestNotificationDirectly(
+                    userId: currentUser.uid,
+                    isRecruiter: roleProvider.isRecruiter,
+                  );
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Test notification created!'),
+                      backgroundColor: Colors.green,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Use these tools to test your notification system',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-
-                  Column(
-                    children: [
-                      // Comprehensive Test
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final debugService = NotificationDebugService();
-                            await debugService.runComprehensiveTest(context);
-                          },
-                          icon: const Icon(Icons.bug_report),
-                          label: const Text('Run Comprehensive Test'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Test Realtime DB Notification
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final currentUser = _auth.currentUser;
-                            if (currentUser == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Please log in to test notifications'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-
-                            final notificationManager = NotificationManagerService();
-                            await notificationManager.sendTestNotification();
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Test notification sent via Realtime DB!'),
-                                backgroundColor: Color(0xFF34C759),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.notifications_active),
-                          label: const Text('Test Realtime DB Notification'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF2D55),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Test Direct Firestore
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final currentUser = _auth.currentUser;
-                            if (currentUser == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Please log in to test notifications'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-
-                            final debugService = NotificationDebugService();
-                            await debugService.createTestNotificationDirectly(context, currentUser.uid);
-                          },
-                          icon: const Icon(Icons.cloud_upload),
-                          label: const Text('Test Direct Firestore'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // ROLE-BASED TEST NOTIFICATIONS - FIXED
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final currentUser = _auth.currentUser;
-                            if (currentUser == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Please log in to test notifications'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-
-                            // Create role-based test notification directly
-                            await _createRoleBasedTestNotification(
-                                context,
-                                currentUser.uid,
-                                roleProvider.isRecruiter
-                            );
-                          },
-                          icon: Icon(roleProvider.isRecruiter ? Icons.person : Icons.work),
-                          label: Text(roleProvider.isRecruiter
-                              ? 'Test Recruiter Notification'
-                              : 'Test Job Seeker Notification'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: roleProvider.isRecruiter ? Colors.purple : Colors.orange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Clear All Notifications
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final debugService = NotificationDebugService();
-                            await debugService.clearAllNotifications(context);
-                            setState(() {});
-                          },
-                          icon: const Icon(Icons.cleaning_services),
-                          label: const Text('Clear All Notifications'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Test Permissions
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final notificationManager = NotificationManagerService();
-                            await notificationManager.testFirestorePermissions();
-                          },
-                          icon: const Icon(Icons.security),
-                          label: const Text('Test Firestore Permissions'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  );
+                },
+                icon: const Icon(Icons.notification_add),
+                label: const Text('Create Test Notification'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF2D55),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // Status Information - SAME FOR BOTH ROLES
+            // Status Information - UPDATED FOR TOP-LEVEL COLLECTION
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -796,29 +702,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  FutureBuilder<DocumentSnapshot>(
-                    future: _firestore
-                        .collection('notifications')
-                        .doc(_auth.currentUser?.uid)
-                        .get(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Text('Checking status...');
-                      }
-
-                      final exists = snapshot.hasData && snapshot.data!.exists;
-                      return Text(
-                        exists ? '✅ Notifications collection exists' : '❌ Notifications collection missing',
-                        style: TextStyle(
-                          color: exists ? Colors.green : Colors.red,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 4),
                   StreamBuilder<QuerySnapshot>(
                     stream: _getNotificationsStream(),
                     builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Text('Checking notification status...');
+                      }
+
                       final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
                       return Text(
                         '📊 Notifications in stream: $count',
@@ -828,7 +718,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       );
                     },
                   ),
-                  // ROLE-BASED STATUS
+                  const SizedBox(height: 4),
+                  Text(
+                    '🏗️ Using top-level collection: notifications',
+                    style: TextStyle(
+                      color: Colors.blue,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     roleProvider.isRecruiter
@@ -865,8 +761,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           return const Color(0xFFFF2D55);
         case 'job_match':
           return const Color(0xFF34C759);
-        case 'viewed_profile':
-          return const Color(0xFF007AFF);
+        case 'interview_scheduled':
+          return Colors.purple;
         case 'new_job':
           return const Color(0xFFFF9500);
         default:
@@ -893,8 +789,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           return Icons.work_outline;
         case 'job_match':
           return Icons.auto_awesome_outlined;
-        case 'viewed_profile':
-          return Icons.remove_red_eye_outlined;
+        case 'interview_scheduled':
+          return Icons.calendar_today;
         case 'new_job':
           return Icons.new_releases_outlined;
         default:
@@ -920,15 +816,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  // ✅ FIXED: Updated to use top-level collection
   void _markAsRead(String notificationId) async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) return;
-
       await _firestore
-          .collection('notifications')
-          .doc(currentUser.uid)
-          .collection('user_notifications')
+          .collection('notifications') // Top-level collection
           .doc(notificationId)
           .update({'isRead': true});
     } catch (e) {
@@ -936,15 +828,49 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  void _handleUsefulFeedback(String notificationId, bool isUseful) async {
+  // ✅ NEW: Mark all notifications as read
+  Future<void> _markAllAsRead(RoleProvider roleProvider) async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return;
 
-      await _firestore
+      // Get all unread notifications
+      final snapshot = await _firestore
           .collection('notifications')
-          .doc(currentUser.uid)
-          .collection('user_notifications')
+          .where('userId', isEqualTo: currentUser.uid)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      // Filter by role and update
+      final batch = _firestore.batch();
+      for (var doc in snapshot.docs) {
+        final notification = doc.data() as Map<String, dynamic>;
+        if (_isNotificationRelevantForRole(notification, roleProvider)) {
+          batch.update(doc.reference, {'isRead': true});
+        }
+      }
+
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All notifications marked as read'),
+            backgroundColor: Color(0xFF34C759),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error marking all as read: $e');
+    }
+  }
+
+  // ✅ FIXED: Updated to use top-level collection
+  void _handleUsefulFeedback(String notificationId, bool isUseful) async {
+    try {
+      await _firestore
+          .collection('notifications') // Top-level collection
           .doc(notificationId)
           .update({
         'feedback': isUseful ? 'useful' : 'not_useful',
@@ -965,12 +891,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  // NEW METHOD: Create role-based test notification
-  Future<void> _createRoleBasedTestNotification(BuildContext context, String userId, bool isRecruiter) async {
+  // ✅ UPDATED: Create role-based test notification in top-level collection
+  Future<void> _createTestNotificationDirectly({
+    required String userId,
+    required bool isRecruiter,
+  }) async {
     try {
-      print('📝 Creating role-based test notification...');
+      print('📝 Creating test notification in top-level collection...');
 
       final notificationData = {
+        'userId': userId,
         'title': isRecruiter ? '👔 New Applicant Alert' : '💼 Job Application Update',
         'body': isRecruiter
             ? 'John Doe has applied for your Senior Flutter Developer position'
@@ -980,7 +910,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         'isRead': false,
         'recipientType': isRecruiter ? 'recruiter' : 'job_seeker',
         'company': isRecruiter ? 'Your Company' : 'Google',
-        'senderName': isRecruiter ? 'Job Portal System' : 'HR Department',
+        'senderName': 'HireHubb',
+        'senderId': 'system',
         'jobId': 'test_job_123',
         'data': {
           'test': true,
@@ -989,24 +920,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         }
       };
 
-      await _firestore
-          .collection('notifications')
-          .doc(userId)
-          .collection('user_notifications')
-          .add(notificationData);
+      // ✅ Save to TOP-LEVEL collection
+      await _firestore.collection('notifications').add(notificationData);
 
-      print('✅ Role-based test notification created for ${isRecruiter ? 'recruiter' : 'job_seeker'}');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ ${isRecruiter ? 'Recruiter' : 'Job Seeker'} test notification created!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      print('✅ Test notification created in top-level collection');
     } catch (e) {
-      print('❌ Role-based test notification error: $e');
+      print('❌ Test notification error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1015,50 +934,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
         );
       }
-    }
-  }
-
-  // Fallback method (keep existing)
-  Future<void> _createTestNotificationDirectly() async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) return;
-
-      print('📝 Creating test notification directly...');
-
-      final testNotification = {
-        'title': '🧪 Test Notification',
-        'body': 'This is a direct test notification created at ${DateTime.now()}',
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': 'test',
-        'isRead': false,
-        'company': 'Test Company',
-        'data': {'test': true, 'debug': true}
-      };
-
-      await _firestore
-          .collection('notifications')
-          .doc(currentUser.uid)
-          .collection('user_notifications')
-          .add(testNotification);
-
-      print('✅ Direct test notification created');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Direct notification created!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-    } catch (e) {
-      print('❌ Direct notification error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Direct notification failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 }

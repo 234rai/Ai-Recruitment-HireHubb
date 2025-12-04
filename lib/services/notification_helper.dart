@@ -1,7 +1,8 @@
 // lib/services/notification_helper.dart - NEW FILE
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart'; // Add this import if not already present
+import 'package:intl/intl.dart';
+import '../models/notification_type.dart';
 
 class NotificationHelper {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -9,7 +10,7 @@ class NotificationHelper {
 
   static Future<bool> sendNotification({
     required String userId,
-    required String type,
+    required NotificationType type,  // ✅ Type-safe enum
     required String title,
     required String body,
     String? jobId,
@@ -21,12 +22,12 @@ class NotificationHelper {
       final currentUser = _auth.currentUser;
 
       final notificationData = {
-        'userId': userId, // ✅ RECIPIENT'S USER ID
+        'userId': userId,
         'recipientId': userId,
-        'title': title,
+        'title': '${type.emoji} $title', // ✅ Auto-add emoji
         'body': body,
         'timestamp': FieldValue.serverTimestamp(),
-        'type': type,
+        'type': type.value, // ✅ Use enum value
         'isRead': false,
         'jobId': jobId,
         'company': company,
@@ -37,16 +38,13 @@ class NotificationHelper {
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // ✅ SAVE TO TOP-LEVEL COLLECTION
-      await _firestore
-          .collection('notifications')
-          .add(notificationData);
+      await _firestore.collection('notifications').add(notificationData);
 
-      print('✅ Notification sent to user: $userId');
+      print('✅ Notification sent: ${type.displayName} to $userId');
       return true;
 
     } catch (e) {
-      print('❌ Error sending notification: $e');
+      print('❌ Notification error: $e');
       return false;
     }
   }
@@ -63,8 +61,8 @@ class NotificationHelper {
     // Notify recruiter about new application
     await sendNotification(
       userId: recruiterId,
-      type: 'new_application',
-      title: '👤 New Application',
+      type: NotificationType.newApplication,  // ✅ Enum
+      title: 'New Application', // ✅ Emoji auto-added
       body: '$applicantName applied for $jobTitle',
       jobId: jobId,
       company: company,
@@ -77,6 +75,7 @@ class NotificationHelper {
   }
 
   /// Send status update notification (when recruiter updates status)
+  /// Send status update notification (when recruiter updates status)
   static Future<void> sendStatusUpdateNotification({
     required String applicantId,
     required String status,
@@ -84,44 +83,35 @@ class NotificationHelper {
     required String company,
     required String jobId,
   }) async {
-    String title = '';
-    String body = '';
-
-    switch (status) {
-      case 'reviewing':
-      case 'inProcess':
-        title = '👀 Application Under Review';
-        body = 'Your application for $jobTitle at $company is being reviewed';
-        break;
-      case 'interview':
-        title = '🎉 Interview Scheduled!';
-        body = 'You have an interview for $jobTitle at $company';
-        break;
-      case 'completed':
-        title = '🎊 Congratulations!';
-        body = 'You\'ve been selected for $jobTitle at $company';
-        break;
-      case 'rejected':
-        title = '📋 Application Update';
-        body = 'Thank you for applying to $jobTitle at $company';
-        break;
-      default:
-        title = '📋 Application Update';
-        body = 'Your application for $jobTitle has been updated';
-    }
+    final (title, body) = _getStatusMessage(status, jobTitle, company);
 
     await sendNotification(
       userId: applicantId,
-      type: 'application_status',
+      type: NotificationType.applicationStatus,
       title: title,
       body: body,
       jobId: jobId,
       company: company,
       recipientType: 'job_seeker',
-      additionalData: {
-        'status': status,
-      },
+      additionalData: {'status': status},
     );
+  }
+
+// ✅ ADD THIS PRIVATE HELPER METHOD at the end of the class
+  static (String, String) _getStatusMessage(String status, String jobTitle, String company) {
+    switch (status) {
+      case 'reviewing':
+      case 'inProcess':
+        return ('Application Under Review', 'Your application for $jobTitle at $company is being reviewed');
+      case 'interview':
+        return ('Interview Scheduled!', 'You have an interview for $jobTitle at $company');
+      case 'completed':
+        return ('Congratulations!', 'You\'ve been selected for $jobTitle at $company');
+      case 'rejected':
+        return ('Application Update', 'Thank you for applying to $jobTitle at $company');
+      default:
+        return ('Application Update', 'Your application for $jobTitle has been updated');
+    }
   }
 
   /// Send message notification
@@ -134,8 +124,8 @@ class NotificationHelper {
   }) async {
     await sendNotification(
       userId: recipientId,
-      type: 'message',
-      title: '💬 New Message',
+      type: NotificationType.messageReceived,
+      title: 'New Message',
       body: '$senderName: $messagePreview',
       recipientType: 'general',
       additionalData: {
@@ -160,8 +150,8 @@ class NotificationHelper {
 
     await sendNotification(
       userId: applicantId,
-      type: 'interview_scheduled',
-      title: '🎉 Interview Scheduled!',
+      type: NotificationType.interviewScheduled,
+      title: 'Interview Scheduled!',
       body: 'You have a $interviewType interview for $jobTitle at $company on $formattedDate',
       jobId: jobId,
       company: company,

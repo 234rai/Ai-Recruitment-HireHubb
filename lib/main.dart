@@ -8,7 +8,6 @@ import 'firebase_options.dart';
 import 'services/realtime_database_service.dart';
 import 'services/notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'services/notification_manager_service.dart';
 
 // Import theme
 import 'theme/app_theme.dart';
@@ -41,16 +40,11 @@ void main() async {
         final notificationService = NotificationService();
         await notificationService.initialize();
         print('✅ Notification Service ready');
-        final notificationManager = NotificationManagerService();
-        notificationManager.initializeNotificationListener();
-        print('✅ Notification Manager ready');
         final fcmToken = await FirebaseMessaging.instance.getToken();
         print('🔥🔥🔥 FCM TOKEN: $fcmToken 🔥🔥🔥');
       } catch (e) {
         print('❌ Notification Service error: $e');
       }
-    } else {
-      print('ℹ️ Web platform - notifications not supported');
     }
 
     // STEP 3: Enable Firebase Realtime Database offline persistence (mobile only)

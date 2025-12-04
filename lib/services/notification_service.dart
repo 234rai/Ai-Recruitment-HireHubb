@@ -168,8 +168,8 @@ class NotificationService {
     // Show local notification
     await _showLocalNotification(message);
 
-    // Save to Firestore
-    await _saveNotificationToFirestore(message);
+    // ✅ Notification already saved by NotificationHelper when triggered
+    // No need to save again here
   }
 
   // Handle notification tap
@@ -177,10 +177,19 @@ class NotificationService {
     print('👆 Notification tapped');
     print('Data: ${message.data}');
 
-    // Save to Firestore if not already saved
-    await _saveNotificationToFirestore(message);
+    // Navigate based on notification type
+    final type = message.data['type'] as String?;
+    final jobId = message.data['jobId'] as String?;
 
-    // TODO: Navigate to specific screen based on notification data
+    switch (type) {
+      case 'new_application':
+      case 'application_status':
+      case 'message':
+        navigatorKey.currentState?.pushNamed('/main');
+        break;
+      default:
+        navigatorKey.currentState?.pushNamed('/main');
+    }
   }
 
   // Handle local notification tap
@@ -266,45 +275,10 @@ class NotificationService {
       message.notification?.title ?? 'Job Update',
       message.notification?.body ?? 'You have a new notification',
       details,
-      payload: message.data['jobId']?.toString(),
+      payload: jsonEncode(message.data), // ✅ Pass full data as JSON
     );
 
     print('✅ Local notification displayed');
-  }
-
-  // REPLACE THE ENTIRE _saveNotificationToFirestore METHOD WITH THIS:
-  Future<void> _saveNotificationToFirestore(RemoteMessage message) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) {
-        print('⚠️ No user logged in, skipping Firestore save');
-        return;
-      }
-
-      final notificationData = {
-        'userId': user.uid,
-        'recipientId': user.uid,
-        'title': message.notification?.title ?? 'Job Update',
-        'body': message.notification?.body ?? '',
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': message.data['type'] ?? 'general',
-        'isRead': false,
-        'jobId': message.data['jobId'],
-        'company': message.data['company'] ?? '',
-        'recipientType': message.data['recipientType'] ?? 'general',
-        'data': message.data,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
-
-      // ✅ SAVE TO TOP-LEVEL COLLECTION (not subcollection)
-      await _firestore
-          .collection('notifications')
-          .add(notificationData);
-
-      print('✅ Notification saved to Firestore (top-level)');
-    } catch (e) {
-      print('❌ Error saving notification to Firestore: $e');
-    }
   }
 
   // Subscribe to topic

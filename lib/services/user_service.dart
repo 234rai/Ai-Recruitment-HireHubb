@@ -14,7 +14,7 @@ class UserService {
   // Cache for current user role with timestamp
   AppUser? _cachedUser;
   DateTime? _cacheTimestamp;
-  static const Duration _cacheDuration = Duration(minutes: 10); // Cache for 10 minutes
+  static const Duration _cacheDuration = Duration(minutes: 2); // ✅ Reduced for role-sensitive ops
 
   // ==================== USER ROLE OPERATIONS ====================
 
@@ -252,6 +252,13 @@ class UserService {
     _cachedUser = null;
     _cacheTimestamp = null;
     print('🗑️ User cache cleared');
+  }
+
+  /// Called when user role changes - clears cache and forces refresh
+  Future<void> onRoleChanged() async {
+    clearCache();
+    await forceRefreshUser();
+    print('🔄 Role changed - cache cleared and refreshed');
   }
 
   /// Force refresh user data (bypass cache)
