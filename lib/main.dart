@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'services/realtime_database_service.dart';
 import 'services/notification_service.dart';
+import 'services/presence_service.dart'; // NEW: Import presence service
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 // Import theme
@@ -67,6 +68,18 @@ void main() async {
       print('✅ Realtime Database connected');
     } else {
       print('⚠️ Realtime Database connection issues');
+    }
+
+    // STEP 5: Initialize Presence Service (for online status & typing)
+    if (!kIsWeb) {
+      try {
+        print('🟢 Initializing Presence Service...');
+        final presenceService = PresenceService();
+        await presenceService.initialize();
+        print('✅ Presence Service ready');
+      } catch (e) {
+        print('⚠️ Presence Service error: $e');
+      }
     }
 
     print('✅ App initialization complete');
@@ -134,7 +147,12 @@ class _AppLifecycleWrapperState extends State<AppLifecycleWrapper> with WidgetsB
   void didChangeAppLifecycleState(AppLifecycleState state) {
     print('📱 AppLifecycleWrapper: State changed to $state');
 
+    final presenceService = PresenceService();
+
     if (state == AppLifecycleState.resumed) {
+      // User is back - set online
+      presenceService.setOnline();
+      
       // CRITICAL FIX: More aggressive refresh with longer delay
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
@@ -148,6 +166,12 @@ class _AppLifecycleWrapperState extends State<AppLifecycleWrapper> with WidgetsB
           print('✅ Role force refreshed after app resume');
         }
       });
+    } else if (state == AppLifecycleState.paused || 
+               state == AppLifecycleState.inactive ||
+               state == AppLifecycleState.detached) {
+      // User left - set offline and stop typing
+      presenceService.setOffline();
+      presenceService.stopCurrentTyping();
     }
   }
 

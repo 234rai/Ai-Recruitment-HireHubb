@@ -156,10 +156,14 @@ class MessagingService {
           .where('isRead', isEqualTo: false)
           .get();
 
-      // Batch update all unread messages
+      // Batch update all unread messages with readAt timestamp
       final batch = _firestore.batch();
+      final now = DateTime.now();
       for (final doc in query.docs) {
-        batch.update(doc.reference, {'isRead': true});
+        batch.update(doc.reference, {
+          'isRead': true,
+          'readAt': Timestamp.fromDate(now), // NEW: Add read timestamp
+        });
       }
 
       // Update conversation's hasUnread flag
@@ -183,6 +187,41 @@ class MessagingService {
         .collection('conversations')
         .where('participants', arrayContains: userId)
         .where('hasUnread', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  // NEW: Mark a single message as read (for individual read receipts)
+  Future<void> markSingleMessageAsRead(String messageId) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) return;
+
+      final messageDoc = await _firestore.collection('messages').doc(messageId).get();
+      if (!messageDoc.exists) return;
+      
+      final messageData = messageDoc.data()!;
+      // Only mark as read if current user is the recipient and not already read
+      if (messageData['recipientId'] == userId && messageData['isRead'] != true) {
+        await _firestore.collection('messages').doc(messageId).update({
+          'isRead': true,
+          'readAt': Timestamp.fromDate(DateTime.now()),
+        });
+      }
+    } catch (e) {
+      print('❌ Error marking single message as read: $e');
+    }
+  }
+
+  // NEW: Get total unread message count for current user (for badge)
+  Stream<int> getUnreadMessageCount() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return Stream.value(0);
+
+    return _firestore
+        .collection('messages')
+        .where('recipientId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
         .snapshots()
         .map((snapshot) => snapshot.docs.length);
   }

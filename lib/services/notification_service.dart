@@ -6,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert'; // For jsonDecode
 import 'package:major_project/main.dart'; // For navigatorKey
+import 'package:major_project/navigation/messaging/chat_screen.dart'; // NEW
+import 'package:major_project/navigation/application_screen.dart'; // NEW
 
 // CRITICAL: Top-level function for background message handling
 @pragma('vm:entry-point')
@@ -177,68 +179,71 @@ class NotificationService {
     print('👆 Notification tapped');
     print('Data: ${message.data}');
 
-    // Navigate based on notification type
-    final type = message.data['type'] as String?;
-    final jobId = message.data['jobId'] as String?;
+    _navigateBasedOnPayload(message.data);
+  }
 
-    switch (type) {
-      case 'new_application':
-      case 'application_status':
-      case 'message':
-        navigatorKey.currentState?.pushNamed('/main');
-        break;
-      default:
-        navigatorKey.currentState?.pushNamed('/main');
+  // Helper method to handle navigation based on payload
+  void _navigateBasedOnPayload(Map<String, dynamic> data) {
+    try {
+      final type = data['type'] as String?;
+       
+      print('🔍 Navigating for type: $type');
+
+      switch (type) {
+        case 'message':
+        case 'conversation': // Handle both types
+          final conversationId = data['conversationId'] as String?;
+          final senderId = data['senderId'] as String?;
+          final senderName = data['senderName'] as String?;
+          
+          if (conversationId != null && senderId != null) {
+            navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(
+                  conversationId: conversationId,
+                  otherParticipantId: senderId,
+                  jobTitle: 'Message', // Default title
+                  otherParticipantName: senderName,
+                ),
+              ),
+            );
+          } else {
+            // Fallback
+            navigatorKey.currentState?.pushNamed('/main');
+          }
+          break;
+
+        case 'new_application':
+        case 'application_status':
+        case 'interview_scheduled':
+          // Navigate to main screen (applications tab handling would be ideal primarily)
+          navigatorKey.currentState?.pushNamed('/main');
+          break;
+          
+        default:
+          navigatorKey.currentState?.pushNamed('/main');
+      }
+    } catch (e) {
+      print('❌ Error navigating from notification: $e');
+      navigatorKey.currentState?.pushNamed('/main');
     }
   }
 
   // Handle local notification tap
-  // In notification_service.dart - REPLACE _onNotificationTapped method:
   void _onNotificationTapped(NotificationResponse response) {
     print('👆 Local notification tapped');
     final payload = response.payload;
 
     if (payload == null || payload.isEmpty) {
-      // No payload, just open notifications screen
       navigatorKey.currentState?.pushNamed('/main');
       return;
     }
 
     try {
-      // Parse payload as JSON
       final data = jsonDecode(payload) as Map<String, dynamic>;
-      final type = data['type'] as String?;
-      final jobId = data['jobId'] as String?;
-
-      print('🔍 Notification type: $type, jobId: $jobId');
-
-      // Navigate based on type
-      switch (type) {
-        case 'new_application':
-        // For recruiters - go to applications screen
-          navigatorKey.currentState?.pushNamed('/main');
-          break;
-
-        case 'application_status':
-        // For job seekers - go to applications screen
-          navigatorKey.currentState?.pushNamed('/main');
-          break;
-
-        case 'message':
-          final conversationId = data['conversationId'] as String?;
-          if (conversationId != null) {
-            // TODO: Navigate to chat screen when messaging is implemented
-            navigatorKey.currentState?.pushNamed('/main');
-          }
-          break;
-
-        default:
-        // Default: go to main screen
-          navigatorKey.currentState?.pushNamed('/main');
-      }
+      _navigateBasedOnPayload(data);
     } catch (e) {
       print('❌ Error handling notification tap: $e');
-      // Fallback: just open main screen
       navigatorKey.currentState?.pushNamed('/main');
     }
   }

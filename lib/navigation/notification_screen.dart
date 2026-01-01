@@ -608,137 +608,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Widget _buildEmptyState(bool isDarkMode, RoleProvider roleProvider) {
     return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              roleProvider.isRecruiter ? Icons.people_outline : Icons.notifications_outlined,
-              size: 80,
-              color: const Color(0xFFFF2D55).withOpacity(0.5),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            roleProvider.isRecruiter ? Icons.people_outline : Icons.notifications_outlined,
+            size: 80,
+            color: const Color(0xFFFF2D55).withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            roleProvider.isRecruiter ? 'No Applicant Notifications' : 'No Notifications Yet',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
             ),
-            const SizedBox(height: 16),
-            Text(
-              roleProvider.isRecruiter ? 'No Applicant Notifications' : 'No Notifications',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
               roleProvider.isRecruiter
-                  ? 'All of your applicant notifications will appear here'
-                  : 'All of your job notifications will appear here',
+                  ? 'When candidates apply to your jobs,\nyou\'ll see notifications here'
+                  : 'Application updates, interview invites,\nand messages will appear here',
               style: TextStyle(
                 fontSize: 14,
                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 30),
-
-            // ✅ SIMPLIFIED: Removed debug section since we're removing those services
-            // Add a simple button to test notifications if needed
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  final currentUser = _auth.currentUser;
-                  if (currentUser == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please log in to test notifications'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-
-                  // Simple test notification
-                  await _createTestNotificationDirectly(
-                    userId: currentUser.uid,
-                    isRecruiter: roleProvider.isRecruiter,
-                  );
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Test notification created!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.notification_add),
-                label: const Text('Create Test Notification'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF2D55),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Status Information - UPDATED FOR TOP-LEVEL COLLECTION
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey.shade900 : Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Current Status:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.white : Colors.blue.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  StreamBuilder<QuerySnapshot>(
-                    stream: _getNotificationsStream(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Text('Checking notification status...');
-                      }
-
-                      final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
-                      return Text(
-                        '📊 Notifications in stream: $count',
-                        style: TextStyle(
-                          color: count > 0 ? Colors.green : Colors.grey,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '🏗️ Using top-level collection: notifications',
-                    style: TextStyle(
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    roleProvider.isRecruiter
-                        ? '👔 Viewing recruiter notifications'
-                        : '💼 Viewing job seeker notifications',
-                    style: TextStyle(
-                      color: roleProvider.isRecruiter ? Colors.blue : Colors.orange,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -888,52 +789,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
     } catch (e) {
       print('Error saving feedback: $e');
-    }
-  }
-
-  // ✅ UPDATED: Create role-based test notification in top-level collection
-  Future<void> _createTestNotificationDirectly({
-    required String userId,
-    required bool isRecruiter,
-  }) async {
-    try {
-      print('📝 Creating test notification in top-level collection...');
-
-      final notificationData = {
-        'userId': userId,
-        'title': isRecruiter ? '👔 New Applicant Alert' : '💼 Job Application Update',
-        'body': isRecruiter
-            ? 'John Doe has applied for your Senior Flutter Developer position'
-            : 'Your application for Senior Flutter Developer has been reviewed',
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': isRecruiter ? 'new_application' : 'application_update',
-        'isRead': false,
-        'recipientType': isRecruiter ? 'recruiter' : 'job_seeker',
-        'company': isRecruiter ? 'Your Company' : 'Google',
-        'senderName': 'HireHubb',
-        'senderId': 'system',
-        'jobId': 'test_job_123',
-        'data': {
-          'test': true,
-          'role': isRecruiter ? 'recruiter' : 'job_seeker',
-          'createdAt': DateTime.now().toIso8601String(),
-        }
-      };
-
-      // ✅ Save to TOP-LEVEL collection
-      await _firestore.collection('notifications').add(notificationData);
-
-      print('✅ Test notification created in top-level collection');
-    } catch (e) {
-      print('❌ Test notification error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Failed to create test notification: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 }

@@ -1,7 +1,10 @@
 // lib/navigation/main_navigation_screen.dart - FIXED VERSION
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // NEW
+import 'package:firebase_auth/firebase_auth.dart'; // NEW
 import '../providers/role_provider.dart';
+import '../services/messaging_service.dart'; // NEW
 import 'home_screen.dart';
 import 'explore_screen.dart';
 import 'application_screen.dart';
@@ -20,6 +23,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   int _currentIndex = 0;
   late AnimationController _animationController;
   late Animation<double> _animation;
+  
+  // NEW: Services for real badge counts
+  final MessagingService _messagingService = MessagingService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
@@ -214,21 +222,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         index: 2,
         isDarkMode: isDarkMode,
       ),
-      _buildNavItem(
+      // NEW: Notification with real count
+      _buildNavItemWithBadge(
         icon: Icons.notifications_none_sharp,
         selectedIcon: Icons.notifications,
         label: 'Notifications',
         index: 3,
         isDarkMode: isDarkMode,
-        showBadge: true,
+        badgeStream: _getNotificationCountStream(),
       ),
-      _buildNavItem( // NEW: Messages tab
+      // NEW: Messages with real count
+      _buildNavItemWithBadge(
         icon: Icons.message_outlined,
         selectedIcon: Icons.message,
         label: 'Messages',
         index: 4,
         isDarkMode: isDarkMode,
-        showBadge: true, // Will show badge for unread messages
+        badgeStream: _messagingService.getUnreadConversationCount(),
       ),
     ];
   }
@@ -256,23 +266,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         label: 'Applications',
         index: 2,
         isDarkMode: isDarkMode,
-        showBadge: true,
       ),
-      _buildNavItem(
+      // NEW: Notification with real count
+      _buildNavItemWithBadge(
         icon: Icons.notifications_none_sharp,
         selectedIcon: Icons.notifications,
         label: 'Notifications',
         index: 3,
         isDarkMode: isDarkMode,
-        showBadge: true,
+        badgeStream: _getNotificationCountStream(),
       ),
-      _buildNavItem( // NEW: Messages tab
+      // NEW: Messages with real count
+      _buildNavItemWithBadge(
         icon: Icons.message_outlined,
         selectedIcon: Icons.message,
         label: 'Messages',
         index: 4,
         isDarkMode: isDarkMode,
-        showBadge: true, // Will show badge for unread messages
+        badgeStream: _messagingService.getUnreadConversationCount(),
       ),
     ];
   }
@@ -329,6 +340,107 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                     ),
                   ),
               ],
+            ),
+            if (isSelected) ...[
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFFFF2D55),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Get notification count stream
+  Stream<int> _getNotificationCountStream() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return Stream.value(0);
+
+    return _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  // NEW: Build nav item with stream-based badge
+  Widget _buildNavItemWithBadge({
+    required IconData icon,
+    required IconData selectedIcon,
+    required String label,
+    required int index,
+    required bool isDarkMode,
+    required Stream<int> badgeStream,
+  }) {
+    final isSelected = _currentIndex == index;
+
+    return GestureDetector(
+      onTap: () => _onTabTapped(index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        padding: EdgeInsets.symmetric(
+          horizontal: isSelected ? 14 : 10,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFFF2D55).withOpacity(0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            StreamBuilder<int>(
+              stream: badgeStream,
+              builder: (context, snapshot) {
+                final count = snapshot.data ?? 0;
+                
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      isSelected ? selectedIcon : icon,
+                      color: isSelected
+                          ? const Color(0xFFFF2D55)
+                          : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
+                      size: 24,
+                    ),
+                    // Show badge with count if > 0
+                    if (count > 0 && !isSelected)
+                      Positioned(
+                        right: -8,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          constraints: const BoxConstraints(minWidth: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF2D55),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            count > 99 ? '99+' : '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
             if (isSelected) ...[
               const SizedBox(height: 4),
