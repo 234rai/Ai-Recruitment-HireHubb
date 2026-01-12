@@ -13,8 +13,29 @@ import 'package:major_project/navigation/application_screen.dart'; // NEW
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('📱 Background message received: ${message.messageId}');
-  print('Title: ${message.notification?.title}');
-  print('Body: ${message.notification?.body}');
+
+  // Show notification even when app is killed
+  final FlutterLocalNotificationsPlugin notifications = FlutterLocalNotificationsPlugin();
+
+  const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    'job_alerts_channel',
+    'Job Alerts',
+    channelDescription: 'Notifications for job updates and alerts',
+    importance: Importance.high,
+    priority: Priority.high,
+    playSound: true,
+    enableVibration: true,
+    color: Color(0xFFFF2D55),
+  );
+
+  const NotificationDetails details = NotificationDetails(android: androidDetails);
+
+  await notifications.show(
+    message.hashCode,
+    message.notification?.title ?? 'New Message',
+    message.notification?.body ?? 'You have a new notification',
+    details,
+  );
 }
 
 class NotificationService {

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../models/notification_type.dart';
+import 'fcm_sender_service.dart';
 
 class NotificationHelper {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -10,7 +11,7 @@ class NotificationHelper {
 
   static Future<bool> sendNotification({
     required String userId,
-    required NotificationType type,  // ✅ Type-safe enum
+    required NotificationType type,
     required String title,
     required String body,
     String? jobId,
@@ -24,10 +25,10 @@ class NotificationHelper {
       final notificationData = {
         'userId': userId,
         'recipientId': userId,
-        'title': '${type.emoji} $title', // ✅ Auto-add emoji
+        'title': '${type.emoji} $title',
         'body': body,
         'timestamp': FieldValue.serverTimestamp(),
-        'type': type.value, // ✅ Use enum value
+        'type': type.value,
         'isRead': false,
         'jobId': jobId,
         'company': company,
@@ -38,7 +39,16 @@ class NotificationHelper {
         'createdAt': FieldValue.serverTimestamp(),
       };
 
+      // Save to Firestore
       await _firestore.collection('notifications').add(notificationData);
+
+      // ✅ NEW: Send push notification via Cloudflare Worker
+      await FCMSenderService.sendPushNotification(
+        recipientId: userId,
+        title: '${type.emoji} $title',
+        body: body,
+        data: additionalData,
+      );
 
       print('✅ Notification sent: ${type.displayName} to $userId');
       return true;
