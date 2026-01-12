@@ -136,53 +136,65 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       final userCredential = await _googleAuthService.signInWithGoogle();
 
       if (userCredential != null && mounted) {
-        print('Google sign-in successful: ${userCredential.user?.email}');
+        print('✅ Google sign-in successful: ${userCredential.user?.email}');
 
-        // Check if user is new (first time sign-in)
+        // 🔥 FIX: Check if user is new FIRST
         final isNewUser = await _googleAuthService.isNewUser(userCredential.user!.uid);
 
         if (isNewUser) {
-          // Show role selection dialog for new users
+          // 🔥 CRITICAL: Show role selection for NEW users
           final selectedRole = await _showGoogleSignInRoleSelectionDialog(context);
 
           if (selectedRole == null) {
-            // User cancelled role selection, sign them out
+            // User cancelled - sign them out
             await _googleAuthService.signOut();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Please select a role to continue'),
-                backgroundColor: Colors.orange,
-              ),
-            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please select a role to continue'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
             return;
           }
 
-          // Save user role to Firestore
+          print('📝 Selected role: $selectedRole');
+
+          // Save role to Firestore with verification
           await _googleAuthService.saveUserRole(
             uid: userCredential.user!.uid,
             email: userCredential.user!.email!,
             displayName: userCredential.user!.displayName ?? '',
             role: selectedRole,
           );
+
+          print('✅ Role saved and verified');
+        } else {
+          print('ℹ️ Existing user - role already set');
         }
 
-        // ⭐ CRITICAL: Refresh role before navigation
-        final roleProvider = Provider.of<RoleProvider>(context, listen: false);
-        await roleProvider.refreshUser();
+        // Refresh role provider
+        if (mounted) {
+          final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+          await roleProvider.forceRefresh();
 
-        print('🔐 Google Sign-in: Role refreshed - ${roleProvider.userRole?.displayName}');
+          print('✅ Role loaded: ${roleProvider.userRole?.displayName}');
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Google sign-in successful!'),
-            backgroundColor: Color(0xFFFF2D55),
-          ),
-        );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Welcome back!'),
+              backgroundColor: Color(0xFFFF2D55),
+            ),
+          );
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
-        );
+          // Navigate to main screen
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+                (route) => false,
+          );
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -192,11 +204,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         );
       }
     } catch (e) {
-      print('Google sign-in error: $e');
+      print('❌ Google sign-in error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to sign in with Google: ${e.toString()}'),
+            content: Text('Failed to sign in: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );

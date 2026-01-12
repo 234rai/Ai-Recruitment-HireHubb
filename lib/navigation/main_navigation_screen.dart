@@ -10,6 +10,7 @@ import 'explore_screen.dart';
 import 'application_screen.dart';
 import 'notification_screen.dart';
 import 'messaging/conversations_screen.dart';
+import 'drawer_navigation/job_management_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -23,7 +24,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   int _currentIndex = 0;
   late AnimationController _animationController;
   late Animation<double> _animation;
-  
+
   // NEW: Services for real badge counts
   final MessagingService _messagingService = MessagingService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -103,36 +104,58 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // CRITICAL FIX: Use Consumer to automatically rebuild when role changes
     return Consumer<RoleProvider>(
       builder: (context, roleProvider, child) {
-        print('🔄 MainNavigationScreen rebuilding...');
+        print('🔄 MainNavigationScreen - Status:');
+        print('   - Firebase User: ${FirebaseAuth.instance.currentUser?.uid}');
+        print('   - RoleProvider User: ${roleProvider.currentUser?.uid}');
         print('   - isLoading: ${roleProvider.isLoading}');
         print('   - Role: ${roleProvider.userRole?.displayName}');
-        print('   - isRecruiter: ${roleProvider.isRecruiter}');
 
-        // Show loading while role is being fetched
-        if (roleProvider.isLoading) {
-          return Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircularProgressIndicator(color: Color(0xFFFF2D55)),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Loading your dashboard...',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
+        // 🔥 CRITICAL: If user is null but Firebase user exists
+        if (FirebaseAuth.instance.currentUser != null &&
+            roleProvider.currentUser == null &&
+            !roleProvider.isLoading) {
+
+          print('⚠️ Inconsistent state detected - forcing refresh');
+
+          // Try to force refresh once
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            await roleProvider.forceRefresh();
+
+            // If still null after refresh, show error
+            if (roleProvider.currentUser == null && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please sign in again'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+
+              // Sign out and redirect
+              await FirebaseAuth.instance.signOut();
+              Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/welcome',
+                      (route) => false
+              );
+            }
+          });
+
+          return _buildLoadingScreen(isDarkMode);
         }
 
-        // ROLE-BASED SCREENS: Different screens for different roles
+        // Normal loading state
+        if (roleProvider.isLoading) {
+          return _buildLoadingScreen(isDarkMode);
+        }
+
+        // 🔥 NEW: Gracefully handle null user
+        if (roleProvider.currentUser == null) {
+          return _buildFallbackScreen(isDarkMode);
+        }
+
+        // Everything is good, show the app
         final List<Widget> screens = roleProvider.isRecruiter
             ? _getRecruiterScreens()
             : _getJobSeekerScreens();
@@ -144,35 +167,106 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
             opacity: _animation,
             child: screens[_currentIndex],
           ),
-          bottomNavigationBar: Container(
-            decoration: BoxDecoration(
-              color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: roleProvider.isRecruiter
-                      ? _getRecruiterNavItems(isDarkMode)
-                      : _getJobSeekerNavItems(isDarkMode),
-                ),
-              ),
-            ),
-          ),
+          bottomNavigationBar: _buildBottomNavBar(isDarkMode, roleProvider),
         );
       },
+    );
+  }
+
+// Add these helper methods:
+  Widget _buildLoadingScreen(bool isDarkMode) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: Color(0xFFFF2D55)),
+            const SizedBox(height: 20),
+            Text(
+              'Loading your dashboard...',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackScreen(bool isDarkMode) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.person_off,
+              size: 64,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'User session expired',
+              style: TextStyle(
+                fontSize: 18,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Please sign in again',
+              style: TextStyle(
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/welcome',
+                        (route) => false
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF2D55),
+              ),
+              child: const Text('Sign In'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavBar(bool isDarkMode, RoleProvider roleProvider) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: roleProvider.isRecruiter
+                ? _getRecruiterNavItems(isDarkMode)
+                : _getJobSeekerNavItems(isDarkMode),
+          ),
+        ),
+      ),
     );
   }
 
@@ -191,10 +285,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   List<Widget> _getRecruiterScreens() {
     return [
       HomeScreen(), // Dashboard
-      ExploreScreen(), // Find Candidates
+      JobManagementScreen(), // Job Management (replaces ExploreScreen)
       ApplicationsScreen(), // Manage Applications
       NotificationsScreen(), // Notifications
-      ConversationsScreen(), // NEW: Messages
+      ConversationsScreen(), // Messages
     ];
   }
 
@@ -404,7 +498,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               stream: badgeStream,
               builder: (context, snapshot) {
                 final count = snapshot.data ?? 0;
-                
+
                 return Stack(
                   clipBehavior: Clip.none,
                   children: [

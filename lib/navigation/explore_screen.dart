@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-import '../providers/role_provider.dart'; // ADD THIS
+import '../providers/role_provider.dart';
+import '../models/job_model.dart';
+import 'package:intl/intl.dart';
+import '../services/firestore_service.dart';
+import '../services/application_service.dart';
+import 'job_detail_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -17,6 +22,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   String _selectedCategory = 'All';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final ApplicationService _applicationService = ApplicationService();
 
   // Search mode: 'jobs' or 'people'
   String _searchMode = 'jobs';
@@ -37,27 +43,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _openToWorkOnly = false;
 
   Stream<QuerySnapshot> get _jobsStream {
-    Query query = _firestore.collection('jobs');
+    // Get ALL jobs (new + old) for explore
+    Query query = _firestore.collection('jobs')
+        .orderBy('postedAt', descending: true)
+        .limit(100); // Limit to 100 for performance
 
+    // Apply search filter if present
     if (_searchController.text.isNotEmpty) {
-      query = query.where('searchKeywords',
-          arrayContains: _searchController.text.toLowerCase());
-    }
-
-    if (_selectedCategory != 'All') {
-      query = query.where('category', isEqualTo: _selectedCategory);
-    }
-
-    if (_remoteOnly) {
-      query = query.where('isRemote', isEqualTo: true);
-    }
-
-    if (_selectedJobType != 'Any') {
-      query = query.where('type', isEqualTo: _selectedJobType);
-    }
-
-    if (_selectedLocation != 'Any') {
-      query = query.where('location', isEqualTo: _selectedLocation);
+      query = _firestore.collection('jobs')
+          .where('searchKeywords', arrayContains: _searchController.text.toLowerCase())
+          .orderBy('postedAt', descending: true)
+          .limit(100);
     }
 
     return query.snapshots();
@@ -134,10 +130,151 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return query.snapshots();
   }
 
+  // ADD THESE METHODS FROM HOME SCREEN
+  void _saveJob(String jobId) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to save jobs'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      await FirestoreService.saveJob(jobId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Job saved successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Save job error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving job: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _unsaveJob(String jobId) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to manage saved jobs'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      await FirestoreService.unsaveJob(jobId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Job removed from saved'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Unsave job error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error removing job: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _applyForJob(Job job) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to apply for jobs'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      final hasApplied = await _applicationService.hasApplied(job.id);
+      if (hasApplied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You have already applied to this job'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+        return;
+      }
+
+      final success = await _applicationService.applyForJob(
+        jobId: job.id,
+        jobTitle: job.position,
+        company: job.company,
+        companyLogo: job.logo,
+        recruiterId: job.recruiterId ?? '',
+      );
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Applied to ${job.position} successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        setState(() {}); // Refresh UI to show "Applied" status
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to submit application. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Apply job error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error applying for job: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showJobDetails(Job job) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => JobDetailScreen(jobId: job.id, job: job),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final roleProvider = Provider.of<RoleProvider>(context); // ADD THIS
+    final roleProvider = Provider.of<RoleProvider>(context);
 
     // For recruiters, default to candidate search
     if (roleProvider.isRecruiter && _searchMode == 'jobs') {
@@ -157,7 +294,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    roleProvider.isRecruiter ? 'Find Candidates' : 'Explore', // ROLE-BASED TITLE
+                    roleProvider.isRecruiter ? 'Find Candidates' : 'Explore',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -531,8 +668,39 @@ class _ExploreScreenState extends State<ExploreScreen> {
           itemCount: filteredJobs.length,
           itemBuilder: (context, index) {
             final doc = filteredJobs[index];
-            final job = doc.data() as Map<String, dynamic>;
-            return _buildJobCard(doc.id, job, isDarkMode);
+            final jobData = doc.data() as Map<String, dynamic>;
+
+            // Convert Firestore document to Job model - FIXED with all required fields
+            final job = Job(
+              id: doc.id,
+              position: jobData['position'] ?? '',
+              company: jobData['company'] ?? '',
+              logo: jobData['logo'] ?? '',
+              logoColor: jobData['logoColor'] ?? 0xFFFF2D55,
+              country: jobData['country'] ?? '',
+              location: jobData['location'] ?? 'Remote',
+              isRemote: jobData['isRemote'] ?? false,
+              salary: jobData['salary'] ?? '',
+              skills: jobData['skills'] is List
+                  ? List<String>.from(jobData['skills'])
+                  : [],
+              postedTime: _getTimeAgo((jobData['postedAt'] as Timestamp).toDate()),
+              isFeatured: jobData['isFeatured'] ?? false,
+              recruiterId: jobData['recruiterId'] ?? '',
+              // ADDING NEW REQUIRED FIELDS:
+              companyDescription: jobData['companyDescription'] ?? '',
+              description: jobData['description'] ?? '',
+              postedAt: jobData['postedAt'] as Timestamp,
+              requirements: jobData['requirements'] is List
+                  ? List<String>.from(jobData['requirements'])
+                  : [],
+              searchKeywords: jobData['searchKeywords'] is List
+                  ? List<String>.from(jobData['searchKeywords'])
+                  : [],
+              type: jobData['type'] ?? 'Full-time',
+            );
+
+            return _buildJobCard(job, isDarkMode);
           },
         );
       },
@@ -626,6 +794,238 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // UPDATED: Job Card with save and apply functionality
+  Widget _buildJobCard(Job job, bool isDarkMode) {
+    return GestureDetector(
+      onTap: () => _showJobDetails(job),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            if (!isDarkMode)
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // Logo
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Color(job.logoColor).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: Text(
+                      job.logo.isNotEmpty ? job.logo : job.company.isNotEmpty ? job.company[0].toUpperCase() : 'C',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(job.logoColor),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        job.position,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        job.company,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                // Save/Bookmark button
+                StreamBuilder<bool>(
+                  stream: Stream.fromFuture(FirestoreService.isJobSaved(job.id)),
+                  builder: (context, snapshot) {
+                    final isSaved = snapshot.data ?? false;
+                    return GestureDetector(
+                      onTap: () => isSaved ? _unsaveJob(job.id) : _saveJob(job.id),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          isSaved ? Icons.bookmark : Icons.bookmark_outline,
+                          size: 20,
+                          color: isSaved
+                              ? const Color(0xFFFF2D55)
+                              : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Location and Type
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _buildInfoChip(Icons.location_on_outlined, job.country, isDarkMode),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: job.isRemote
+                        ? const Color(0xFF10B981).withOpacity(0.1)
+                        : Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    job.location,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: job.isRemote ? const Color(0xFF10B981) : Colors.orange,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Skills
+            if (job.skills.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: job.skills.take(3).map((skill) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      skill,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+
+            const SizedBox(height: 10),
+
+            // Salary, Time, and Apply Button
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.paid_outlined,
+                      size: 14,
+                      color: const Color(0xFFFF2D55),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      job.salary,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFFF2D55),
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Text(
+                      job.postedTime,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Apply Button
+                    FutureBuilder<bool>(
+                      future: _applicationService.hasApplied(job.id),
+                      builder: (context, snapshot) {
+                        final hasApplied = snapshot.data ?? false;
+                        return GestureDetector(
+                          onTap: hasApplied ? null : () => _applyForJob(job),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: hasApplied
+                                  ? const Color(0xFF34C759)
+                                  : const Color(0xFFFF2D55),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  hasApplied ? Icons.check : Icons.send,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  hasApplied ? 'Applied' : 'Apply',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -809,192 +1209,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       fontSize: 12,
                       color: Colors.white,
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildJobCard(String docId, Map<String, dynamic> job, bool isDarkMode) {
-    final title = job['position']?.toString().trim() ?? 'No Title';
-    final company = job['company']?.toString().trim() ?? 'Unknown Company';
-    final salary = job['salary']?.toString().trim() ?? 'Not specified';
-    final location = job['country']?.toString().trim() ?? 'Location not specified';
-    final isRemote = job['isRemote'] == true;
-    final locationType = job['location']?.toString() ?? (isRemote ? 'Remote' : 'On-site');
-
-    final postedDate = job['postedAt'] != null
-        ? (job['postedAt'] as Timestamp).toDate()
-        : DateTime.now();
-    final timeAgo = _getTimeAgo(postedDate);
-
-    return GestureDetector(
-      onTap: () => _showJobDetails(job, isDarkMode),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            if (!isDarkMode)
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                // Logo
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: job['logoColor'] != null
-                        ? Color(job['logoColor']).withOpacity(0.1)
-                        : const Color(0xFFFF2D55).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      job['logo']?.toString() ??
-                          (company.isNotEmpty ? company[0].toUpperCase() : 'C'),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: job['logoColor'] != null
-                            ? Color(job['logoColor'])
-                            : const Color(0xFFFF2D55),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        company,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.bookmark_border,
-                  size: 20,
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Location and Type
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _buildInfoChip(Icons.location_on_outlined, location, isDarkMode),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isRemote
-                        ? const Color(0xFF10B981).withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    locationType,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: isRemote ? const Color(0xFF10B981) : Colors.orange,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // Skills
-            if (job['skills'] != null && job['skills'] is List && (job['skills'] as List).isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: (job['skills'] as List).take(3).map((skill) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      skill.toString(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-
-            const SizedBox(height: 10),
-
-            // Salary and Time
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.paid_outlined,
-                      size: 14,
-                      color: const Color(0xFFFF2D55),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      salary,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFFF2D55),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  timeAgo,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                   ),
                 ),
               ],
@@ -1805,7 +2019,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final now = DateTime.now();
     final difference = now.difference(date);
 
-    if (difference.inDays > 0) {
+    if (difference.inDays > 365) {
+      return DateFormat('MMM d, yyyy').format(date);
+    } else if (difference.inDays > 30) {
+      final months = (difference.inDays / 30).floor();
+      return '$months month${months > 1 ? 's' : ''} ago';
+    } else if (difference.inDays > 0) {
       return '${difference.inDays}d ago';
     } else if (difference.inHours > 0) {
       return '${difference.inHours}h ago';
@@ -1814,11 +2033,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
     } else {
       return 'Just now';
     }
-  }
-
-  void _showJobDetails(Map<String, dynamic> job, bool isDarkMode) {
-    // Navigate to job details
-    print('Show job details: ${job['position']}');
   }
 
   void _showUserProfile(String userId, Map<String, dynamic> user, bool isDarkMode) {

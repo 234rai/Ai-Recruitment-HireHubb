@@ -15,6 +15,7 @@ import 'drawer_navigation/saved_jobs_screen.dart';
 import 'chatbot_screen.dart';
 import 'settings_screen.dart';
 import '../providers/role_provider.dart';
+import 'job_post_screen.dart'; // Add this import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -152,6 +153,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ApplicationsScreen()),
+    );
+  }
+
+  void _openJobPostScreen() {
+    Navigator.pop(context); // Close drawer if open
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const JobPostScreen()),
     );
   }
 
@@ -634,9 +643,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       _buildRecruiterAction(
                         icon: Icons.add_box_outlined,
                         label: 'Post New Job',
-                        onTap: () {
-                          // TODO: Navigate to post job screen
-                        },
+                        onTap: _openJobPostScreen,
                         isDarkMode: isDarkMode,
                       ),
                       _buildRecruiterAction(
@@ -771,7 +778,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // Job Seeker Content (your existing job feed)
   Widget _buildJobSeekerContent(bool isDarkMode) {
     return StreamBuilder<List<Job>>(
-      stream: FirestoreService.getPersonalizedJobFeed(),
+      stream: FirestoreService.getLatestJobFeed(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return SliverToBoxAdapter(
@@ -1074,7 +1081,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         _buildDrawerItem(
                           icon: Icons.add_box_outlined,
                           title: 'Post a Job',
-                          onTap: () {},
+                          onTap: _openJobPostScreen,
                           isDarkMode: isDarkMode,
                         ),
                         _buildDrawerItem(

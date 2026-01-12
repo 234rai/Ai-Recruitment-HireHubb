@@ -40,7 +40,13 @@ class PresenceService {
   void _setupPresence(String userId) {
     final userPresenceRef = _database.ref('presence/$userId');
     final connectedRef = _database.ref('.info/connected');
-
+    final typingRef = _database.ref('typing');
+    userPresenceRef.onDisconnect().update({
+      'online': false,
+      'lastSeen': ServerValue.timestamp,
+    });
+    // Also remove any typing entries for this user
+    typingRef.child(userId).onDisconnect().remove();
     // Listen to connection state
     connectedRef.onValue.listen((event) {
       final isConnected = event.snapshot.value as bool? ?? false;

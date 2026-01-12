@@ -119,6 +119,46 @@ class FirestoreService {
     });
   }
 
+  // Get latest jobs for home feed (last 7 days)
+  static Stream<List<Job>> getLatestJobFeed() {
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+
+    return _jobsCollection
+        .where('postedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(sevenDaysAgo))
+        .orderBy('postedAt', descending: true)
+        .limit(20)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        if (!data.containsKey('recruiterId')) {
+          data['recruiterId'] = '';
+        }
+        return Job.fromMap(data, doc.id);
+      }).toList();
+    });
+  }
+
+// Get older jobs for explore tab (older than 7 days)
+  static Stream<List<Job>> getExploreJobFeed() {
+    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+
+    return _jobsCollection
+        .where('postedAt', isLessThan: Timestamp.fromDate(sevenDaysAgo))
+        .orderBy('postedAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        if (!data.containsKey('recruiterId')) {
+          data['recruiterId'] = '';
+        }
+        return Job.fromMap(data, doc.id);
+      }).toList();
+    });
+  }
+
   // Save job for later (Updated to use subcollection)
   static Future<void> saveJob(String jobId) async {
     final user = _auth.currentUser;
@@ -570,5 +610,121 @@ class FirestoreService {
       print('Error getting recruiter profile: $e');
       return null;
     }
+  }
+  // ADD THESE METHODS TO YOUR firestore_service.dart
+// Add them at the end of the class, before the closing brace
+
+  // ============================================================================
+  // 🚀 NEW METHODS FOR RECRUITER FEATURES
+  // ============================================================================
+
+  // Get jobs posted by current recruiter
+  static Stream<List<Job>> getRecruiterJobs() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return Stream.value([]);
+
+    return _jobsCollection
+        .where('recruiterId', isEqualTo: userId)
+        .orderBy('postedAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return Job.fromMap(data, doc.id);
+      }).toList();
+    });
+  }
+
+  // Get application count for a specific job
+  static Future<int> getJobApplicationsCount(String jobId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('applications')
+          .where('jobId', isEqualTo: jobId)
+          .get();
+
+      return snapshot.docs.length;
+    } catch (e) {
+      print('Error getting application count: $e');
+      return 0;
+    }
+  }
+
+  // Update job (for editing, closing, reopening)
+  static Future<void> updateJob(String jobId, Map<String, dynamic> updates) async {
+    try {
+      await _jobsCollection.doc(jobId).update(updates);
+      print('✅ Job updated successfully');
+    } catch (e) {
+      print('❌ Error updating job: $e');
+      throw e;
+    }
+  }
+
+  // Delete job
+  static Future<void> deleteJob(String jobId) async {
+    try {
+      // Delete the job document
+      await _jobsCollection.doc(jobId).delete();
+
+      // Optional: Delete related applications
+      final applicationsSnapshot = await _firestore
+          .collection('applications')
+          .where('jobId', isEqualTo: jobId)
+          .get();
+
+      for (var doc in applicationsSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      print('✅ Job deleted successfully');
+    } catch (e) {
+      print('❌ Error deleting job: $e');
+      throw e;
+    }
+  }
+
+  // Get all applications for recruiter's jobs
+  static Stream<List<Map<String, dynamic>>> getRecruiterApplications() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return Stream.value([]);
+
+    return _firestore
+        .collection('applications')
+        .where('recruiterId', isEqualTo: userId)
+        .orderBy('appliedAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      List<Map<String, dynamic>> applications = [];
+
+      for (var doc in snapshot.docs) {
+        final appData = doc.data();
+        final jobId = appData['jobId'] as String?;
+
+        if (jobId != null) {
+          try {
+            final jobDoc = await _jobsCollection.doc(jobId).get();
+            if (jobDoc.exists) {
+              final jobData = jobDoc.data() as Map<String, dynamic>;
+              final job = Job.fromMap(jobData, jobDoc.id);
+
+              applications.add({
+                'applicationId': doc.id,
+                'job': job,
+                'applicantId': appData['userId'],
+                'applicantName': appData['userName'],
+                'applicantEmail': appData['userEmail'],
+                'appliedAt': appData['appliedAt'],
+                'status': appData['status'] ?? 'pending',
+              });
+            }
+          } catch (e) {
+            print('Error fetching application: $e');
+          }
+        }
+      }
+
+      return applications;
+    });
   }
 }
