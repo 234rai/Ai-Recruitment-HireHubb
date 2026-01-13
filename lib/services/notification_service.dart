@@ -150,34 +150,64 @@ class NotificationService {
   // Setup FCM token and handle refresh
   Future<void> _setupFCMToken() async {
     try {
-      // Get FCM token
+      print('🔑 Requesting FCM token...');
+
       String? token = await _firebaseMessaging.getToken();
+
       if (token != null) {
         print('📱 FCM Token: $token');
+        print('🔄 Now saving to Firestore...');
         await _saveTokenToFirestore(token);
       }
 
-      // Listen for token refresh
       _firebaseMessaging.onTokenRefresh.listen(_saveTokenToFirestore);
-    } catch (e) {
-      print('❌ Error getting FCM token: $e');
+    } catch (e, stackTrace) {
+      print('❌ Error in _setupFCMToken: $e');
+      print('Stack: $stackTrace');
     }
   }
 
   // Save FCM token to Firestore
   Future<void> _saveTokenToFirestore(String token) async {
     try {
+      print('💾 [SAVING TOKEN] Starting...');
+
       final user = _auth.currentUser;
-      if (user != null) {
-        await _firestore.collection('users').doc(user.uid).set({
-          'fcmToken': token,
-          'updatedAt': FieldValue.serverTimestamp(),
-          'platform': 'android',
-        }, SetOptions(merge: true));
-        print('✅ FCM token saved to Firestore');
+
+      if (user == null) {
+        print('❌ [SAVING TOKEN] No user logged in!');
+        await Future.delayed(Duration(seconds: 2));
+        final retryUser = _auth.currentUser;
+        if (retryUser == null) {
+          print('❌ [SAVING TOKEN] Still no user after retry');
+          return;
+        }
       }
-    } catch (e) {
-      print('❌ Error saving FCM token: $e');
+
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) return;
+
+      print('💾 [SAVING TOKEN] User ID: $userId');
+      print('💾 [SAVING TOKEN] Token: ${token.substring(0, 30)}...');
+
+      await _firestore.collection('users').doc(userId).set({
+        'fcmToken': token,
+        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+        'platform': 'android',
+        'lastActive': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      print('✅ [SAVING TOKEN] FCM token saved successfully!');
+
+      // Verify
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists && doc.data()?['fcmToken'] == token) {
+        print('✅ [VERIFICATION] Token verified in Firestore!');
+      }
+
+    } catch (e, stackTrace) {
+      print('❌ [SAVING TOKEN] Error: $e');
+      print('❌ Stack: $stackTrace');
     }
   }
 
@@ -325,5 +355,19 @@ class NotificationService {
     } catch (e) {
       print('❌ Error unsubscribing from topic: $e');
     }
+  }
+
+  // Listen to auth changes and save token when user logs in
+  void setupAuthListener() {
+    _auth.authStateChanges().listen((User? user) {
+      if (user != null) {
+        print('🔐 User logged in, saving FCM token...');
+        _firebaseMessaging.getToken().then((token) {
+          if (token != null) {
+            _saveTokenToFirestore(token);
+          }
+        });
+      }
+    });
   }
 }
