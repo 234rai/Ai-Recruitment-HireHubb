@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "446492818809",
+    "firebase_url": "https://recuritmentproject-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "recuritmentproject",
+    "storage_bucket": "recuritmentproject.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:446492818809:android:9cca3db1e3190c14f643a8",
+        "android_client_info": {
+          "package_name": "com.example.major_project"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "446492818809-m8e7vg64vle1iu403bihjg2v4tvnh6hf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.major_project",
+            "certificate_hash": "d4d352df8050294c558dbfe25ce7760f0387f822"
+          }
+        },
+        {
+          "client_id": "446492818809-q5t0smrd922r0ml210g13gnqnprmlfd8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAi9jQYkeUIzE3SkqMY47Mwx1Zz1VO1_aA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "446492818809-q5t0smrd922r0ml210g13gnqnprmlfd8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
