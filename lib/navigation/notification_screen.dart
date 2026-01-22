@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:major_project/providers/role_provider.dart';
+import '../utils/responsive_helper.dart';
 
 // ✅ REMOVED unnecessary imports
 // import 'package:major_project/services/notification_manager_service.dart';
@@ -98,12 +99,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final roleProvider = Provider.of<RoleProvider>(context);
+    final responsive = ResponsiveHelper(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(responsive.padding(20)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -113,12 +115,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   Text(
                     roleProvider.isRecruiter ? 'Recruiter Notifications' : 'Notifications',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: responsive.fontSize(28),
                       fontWeight: FontWeight.bold,
                       color: isDarkMode ? Colors.white : Colors.black,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: responsive.width(12)),
                   // ✅ NEW: Unread count badge
                   StreamBuilder<int>(
                     stream: _getUnreadCountStream(roleProvider),
@@ -127,16 +129,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       if (unreadCount == 0) return const SizedBox.shrink();
 
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: EdgeInsets.symmetric(horizontal: responsive.padding(10), vertical: responsive.padding(4)),
                         decoration: BoxDecoration(
                           color: roleProvider.isRecruiter ? Colors.green : const Color(0xFFFF2D55),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(responsive.radius(12)),
                         ),
                         child: Text(
                           '$unreadCount',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
-                            fontSize: 14,
+                            fontSize: responsive.fontSize(14),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -145,17 +147,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: responsive.height(8)),
               Text(
                 roleProvider.isRecruiter
                     ? 'Stay updated with applicant alerts and messages'
                     : 'Stay updated with job alerts and applications',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: responsive.fontSize(14),
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: responsive.height(24)),
 
               // Notifications List - USE ROLE-BASED STREAM
               Expanded(
@@ -164,7 +166,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   builder: (context, snapshot) {
                     // Handle no user case
                     if (_auth.currentUser == null) {
-                      return _buildAuthRequiredState(isDarkMode);
+                      return _buildAuthRequiredState(isDarkMode, responsive);
                     }
 
                     // Handle stream null case
@@ -174,6 +176,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           'Unable to load notifications',
                           style: TextStyle(
                             color: isDarkMode ? Colors.grey : Colors.black54,
+                            fontSize: responsive.fontSize(14),
                           ),
                         ),
                       );
@@ -185,11 +188,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
                     if (snapshot.hasError) {
                       print('Notification stream error: ${snapshot.error}');
-                      return _buildErrorState(snapshot.error.toString(), isDarkMode);
+                      return _buildErrorState(snapshot.error.toString(), isDarkMode, responsive);
                     }
 
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return _buildEmptyState(isDarkMode, roleProvider);
+                      return _buildEmptyState(isDarkMode, roleProvider, responsive);
                     }
 
                     // ✅ Filter notifications client-side based on role
@@ -201,7 +204,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
                     // Show empty state if no notifications after filtering
                     if (filteredNotifications.isEmpty) {
-                      return _buildEmptyState(isDarkMode, roleProvider);
+                      return _buildEmptyState(isDarkMode, roleProvider, responsive);
                     }
 
                     return ListView.builder(
@@ -216,6 +219,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           notificationId,
                           isDarkMode,
                           roleProvider,
+                          responsive,
                         );
                       },
                     );
@@ -229,38 +233,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Widget _buildErrorState(String error, bool isDarkMode) {
+  Widget _buildErrorState(String error, bool isDarkMode, ResponsiveHelper responsive) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Icons.error_outline,
-            size: 64,
+            size: responsive.iconSize(64),
             color: Colors.red.withOpacity(0.7),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: responsive.height(16)),
           Text(
             'Failed to load notifications',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: responsive.fontSize(18),
               fontWeight: FontWeight.w600,
               color: isDarkMode ? Colors.white : Colors.black,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: responsive.height(8)),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: EdgeInsets.symmetric(horizontal: responsive.padding(20)),
             child: Text(
               error.length > 100 ? '${error.substring(0, 100)}...' : error,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: responsive.fontSize(12),
                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
               ),
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: responsive.height(20)),
           ElevatedButton(
             onPressed: () {
               setState(() {});
@@ -276,30 +280,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Widget _buildAuthRequiredState(bool isDarkMode) {
+  Widget _buildAuthRequiredState(bool isDarkMode, ResponsiveHelper responsive) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Icons.login,
-            size: 64,
+            size: responsive.iconSize(64),
             color: const Color(0xFFFF2D55).withOpacity(0.7),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: responsive.height(16)),
           Text(
             'Authentication Required',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: responsive.fontSize(20),
               fontWeight: FontWeight.w600,
               color: isDarkMode ? Colors.white : Colors.black,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: responsive.height(8)),
           Text(
             'Please log in to view your notifications',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: responsive.fontSize(14),
               color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
             ),
             textAlign: TextAlign.center,
@@ -314,6 +318,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       String notificationId,
       bool isDarkMode,
       RoleProvider roleProvider,
+      ResponsiveHelper responsive,
       ) {
     final title = notification['title'] ?? 'Notification';
     final body = notification['body'] ?? '';
@@ -378,14 +383,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: responsive.height(12)),
       color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
       elevation: 2,
       child: InkWell(
         onTap: () => _markAsRead(notificationId),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(responsive.radius(12)),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(responsive.padding(16)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -393,19 +398,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: responsive.width(40),
+                    height: responsive.width(40),
                     decoration: BoxDecoration(
                       color: _getNotificationColor(type, roleProvider).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(responsive.radius(8)),
                     ),
                     child: Icon(
                       _getNotificationIcon(type, roleProvider),
                       color: _getNotificationColor(type, roleProvider),
-                      size: 20,
+                      size: responsive.iconSize(20),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: responsive.width(12)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -417,7 +422,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               child: Text(
                                 title,
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: responsive.fontSize(16),
                                   fontWeight: FontWeight.w600,
                                   color: isDarkMode ? Colors.white : Colors.black,
                                 ),
@@ -425,18 +430,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             ),
                             if (roleProvider.isRecruiter && type == 'new_application')
                               Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: responsive.padding(6),
+                                  vertical: responsive.padding(2),
                                 ),
                                 decoration: BoxDecoration(
                                   color: Colors.green.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
+                                  borderRadius: BorderRadius.circular(responsive.radius(4)),
                                 ),
                                 child: Text(
                                   'NEW',
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: responsive.fontSize(10),
                                     color: Colors.green,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -444,11 +449,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: responsive.height(4)),
                         Text(
                           displayBody,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: responsive.fontSize(14),
                             color: isDarkMode
                                 ? Colors.grey.shade400
                                 : Colors.grey.shade600,
@@ -457,21 +462,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         ),
                         // ROLE-BASED SENDER INFO
                         if (senderName.isNotEmpty && roleProvider.isRecruiter) ...[
-                          const SizedBox(height: 8),
+                          SizedBox(height: responsive.height(8)),
                           Row(
                             children: [
                               Icon(
                                 Icons.person_outline,
-                                size: 12,
+                                size: responsive.iconSize(12),
                                 color: isDarkMode
                                     ? Colors.grey.shade400
                                     : Colors.grey.shade600,
                               ),
-                              const SizedBox(width: 4),
+                              SizedBox(width: responsive.width(4)),
                               Text(
                                 'From: $senderName',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: responsive.fontSize(12),
                                   color: isDarkMode
                                       ? Colors.grey.shade400
                                       : Colors.grey.shade600,
@@ -481,22 +486,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           ),
                         ],
                         if (company.isNotEmpty) ...[
-                          const SizedBox(height: 8),
+                          SizedBox(height: responsive.height(8)),
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: responsive.padding(8),
+                              vertical: responsive.padding(4),
                             ),
                             decoration: BoxDecoration(
                               color: isDarkMode
                                   ? Colors.grey.shade800
                                   : Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(responsive.radius(6)),
                             ),
                             child: Text(
                               company,
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: responsive.fontSize(12),
                                 color: isDarkMode
                                     ? Colors.grey.shade400
                                     : Colors.grey.shade600,
@@ -505,14 +510,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 12),
+                        SizedBox(height: responsive.height(12)),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               _formatTimestamp(timestamp),
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: responsive.fontSize(12),
                                 color: isDarkMode
                                     ? Colors.grey.shade500
                                     : Colors.grey.shade500,
@@ -520,9 +525,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             ),
                             Row(
                               children: [
-                                _buildUsefulButton(notificationId, true, isDarkMode),
-                                const SizedBox(width: 8),
-                                _buildUsefulButton(notificationId, false, isDarkMode),
+                                _buildUsefulButton(notificationId, true, isDarkMode, responsive),
+                                SizedBox(width: responsive.width(8)),
+                                _buildUsefulButton(notificationId, false, isDarkMode, responsive),
                               ],
                             ),
                           ],
@@ -532,8 +537,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                   if (!isRead)
                     Container(
-                      width: 8,
-                      height: 8,
+                      width: responsive.width(8),
+                      height: responsive.width(8),
                       decoration: BoxDecoration(
                         color: roleProvider.isRecruiter
                             ? Colors.green
@@ -544,7 +549,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ],
               ),
               if (jobId != null) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: responsive.height(12)),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -562,9 +567,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           ? Colors.green
                           : const Color(0xFFFF2D55),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: EdgeInsets.symmetric(vertical: responsive.padding(12)),
                     ),
-                    child: Text(actionButtonText),
+                    child: Text(actionButtonText, style: TextStyle(fontSize: responsive.fontSize(14))),
                   ),
                 ),
               ],
@@ -575,28 +580,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Widget _buildUsefulButton(String notificationId, bool isUseful, bool isDarkMode) {
+  Widget _buildUsefulButton(String notificationId, bool isUseful, bool isDarkMode, ResponsiveHelper responsive) {
     return GestureDetector(
       onTap: () => _handleUsefulFeedback(notificationId, isUseful),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: responsive.padding(12), vertical: responsive.padding(6)),
         decoration: BoxDecoration(
           color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(responsive.radius(16)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               isUseful ? Icons.thumb_up_alt_outlined : Icons.thumb_down_alt_outlined,
-              size: 14,
+              size: responsive.iconSize(14),
               color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
             ),
-            const SizedBox(width: 4),
+            SizedBox(width: responsive.width(4)),
             Text(
               isUseful ? 'Yes' : 'No',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: responsive.fontSize(12),
                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
               ),
             ),
@@ -606,34 +611,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Widget _buildEmptyState(bool isDarkMode, RoleProvider roleProvider) {
+  Widget _buildEmptyState(bool isDarkMode, RoleProvider roleProvider, ResponsiveHelper responsive) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             roleProvider.isRecruiter ? Icons.people_outline : Icons.notifications_outlined,
-            size: 80,
+            size: responsive.iconSize(80),
             color: const Color(0xFFFF2D55).withOpacity(0.5),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: responsive.height(16)),
           Text(
             roleProvider.isRecruiter ? 'No Applicant Notifications' : 'No Notifications Yet',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: responsive.fontSize(24),
               fontWeight: FontWeight.bold,
               color: isDarkMode ? Colors.white : Colors.black,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: responsive.height(8)),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
+            padding: EdgeInsets.symmetric(horizontal: responsive.padding(40)),
             child: Text(
               roleProvider.isRecruiter
                   ? 'When candidates apply to your jobs,\nyou\'ll see notifications here'
                   : 'Application updates, interview invites,\nand messages will appear here',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: responsive.fontSize(14),
                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
               ),
               textAlign: TextAlign.center,

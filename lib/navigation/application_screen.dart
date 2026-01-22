@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-import 'package:major_project/providers/role_provider.dart'; // ADD THIS
+import 'package:major_project/providers/role_provider.dart';
+import 'applications/applicant_profile_bottom_sheet.dart';
+import '../utils/responsive_helper.dart';
 
 class ApplicationsScreen extends StatefulWidget {
   const ApplicationsScreen({super.key});
@@ -86,64 +88,24 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
 
               // Filters for Recruiter
               if (roleProvider.isRecruiter) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedFilter,
-                        items: ['All Jobs', 'Active Jobs', 'Closed Jobs']
-                            .map((job) => DropdownMenuItem(
-                          value: job,
-                          child: Text(job),
-                        ))
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedFilter = value!;
-                          });
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'Filter by Job',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedStatusFilter,
-                        items: [
-                          'All Status',
-                          'Pending',
-                          'Reviewed',
-                          'Rejected',
-                          'Hired'
-                        ]
-                            .map((status) => DropdownMenuItem(
-                          value: status,
-                          child: Text(status),
-                        ))
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedStatusFilter = value!;
-                          });
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'Filter by Status',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ],
+                // Status Filter Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip('All', 'All Status', isDarkMode),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Pending', 'Pending', isDarkMode),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('In Review', 'Reviewed', isDarkMode),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Shortlisted', 'Shortlisted', isDarkMode),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Hired', 'Hired', isDarkMode),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Rejected', 'Rejected', isDarkMode),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -182,16 +144,36 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
           );
         }
 
-        final applications = snapshot.data?.docs ?? [];
+        final allApplications = snapshot.data?.docs ?? [];
 
-        if (applications.isEmpty) {
+        // Apply status filter
+        final filteredApplications = allApplications.where((doc) {
+          if (_selectedStatusFilter == 'All Status') return true;
+          final status = doc['status'] as String?;
+          switch (_selectedStatusFilter) {
+            case 'Pending':
+              return status == 'applied' || status == 'pending';
+            case 'Reviewed':
+              return status == 'inProcess';
+            case 'Shortlisted':
+              return status == 'shortlisted';
+            case 'Hired':
+              return status == 'completed';
+            case 'Rejected':
+              return status == 'rejected';
+            default:
+              return true;
+          }
+        }).toList();
+
+        if (filteredApplications.isEmpty) {
           return _buildEmptyStateForRecruiter(isDarkMode);
         }
 
         return ListView.builder(
-          itemCount: applications.length,
+          itemCount: filteredApplications.length,
           itemBuilder: (context, index) {
-            final doc = applications[index];
+            final doc = filteredApplications[index];
             final application = Application.fromFirestore(doc);
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -201,6 +183,41 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildFilterChip(String label, String value, bool isDarkMode) {
+    final isSelected = _selectedStatusFilter == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedStatusFilter = value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFFF2D55)
+              : (isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade200),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFFFF2D55)
+                : (isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isSelected
+                ? Colors.white
+                : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700),
+          ),
+        ),
+      ),
     );
   }
 
@@ -312,7 +329,6 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with Job Seeker Info
             Row(
               children: [
                 Container(
@@ -322,12 +338,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
                     color: const Color(0xFF007AFF).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Center(
-                    child: Icon(
-                      Icons.person,
-                      color: const Color(0xFF007AFF),
-                      size: 20,
-                    ),
+                  child: const Center(
+                    child: Icon(Icons.person, color: Color(0xFF007AFF), size: 20),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -357,13 +369,11 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 _buildStatusChip(application.status, isDarkMode),
               ],
             ),
-
             const SizedBox(height: 16),
-
-            // Company and Job Info
             Row(
               children: [
                 Icon(
@@ -372,14 +382,18 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
                   color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  application.company,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                Expanded(
+                  child: Text(
+                    application.company,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 12),
                 Icon(
                   Icons.calendar_today_outlined,
                   size: 14,
@@ -387,7 +401,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  DateFormat('MMM dd, yyyy').format(application.appliedDate),
+                  DateFormat('MMM dd').format(application.appliedDate),
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
@@ -395,31 +409,32 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 16),
-
-            // Actions for Recruiter
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {
-                      // View application details
-                      _viewApplicationDetails(application);
-                    },
+                    onPressed: () => _viewApplicationDetails(application),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF007AFF),
                       side: const BorderSide(color: Color(0xFF007AFF)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.remove_red_eye, size: 16),
-                        const SizedBox(width: 8),
-                        Text('View Details'),
+                        SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'View',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -427,23 +442,27 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      // Update application status
-                      _updateApplicationStatus(application);
-                    },
+                    onPressed: () => _updateApplicationStatus(application),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFF2D55),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.edit, size: 16),
-                        const SizedBox(width: 8),
-                        Text('Update Status'),
+                        SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Update',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -472,6 +491,11 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
         textColor = const Color(0xFF007AFF);
         text = 'In Review';
         break;
+      case ApplicationStatus.shortlisted:
+        backgroundColor = const Color(0xFF5856D6).withOpacity(0.1);
+        textColor = const Color(0xFF5856D6);
+        text = 'Shortlisted';
+        break;
       case ApplicationStatus.completed:
         backgroundColor = const Color(0xFF34C759).withOpacity(0.1);
         textColor = const Color(0xFF34C759);
@@ -494,6 +518,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
         ),
       ),
       backgroundColor: backgroundColor,
+      padding: EdgeInsets.zero,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
       ),
@@ -501,44 +527,520 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
   }
 
   void _viewApplicationDetails(Application application) {
-    // TODO: Implement view application details
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Application Details'),
-        content: Text('Details for ${application.jobSeekerName}'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return ApplicantProfileBottomSheet(
+            userId: application.userId,
+            applicationId: application.id,
+            scrollController: scrollController,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildProfileContent(Map<String, dynamic> userData, Application application) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Profile Header
+        Center(
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 50,
+                backgroundColor: const Color(0xFF007AFF).withOpacity(0.1),
+                child: Text(
+                  (userData['name'] ?? 'U')[0].toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 32,
+                    color: Color(0xFF007AFF),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                userData['name'] ?? 'Unknown',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: theme.textTheme.bodyLarge?.color,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                userData['email'] ?? '',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF007AFF).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Applied for: ${application.jobTitle}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF007AFF),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // Contact Information Section
+        _buildSectionTitle('Contact Information', Icons.contact_phone),
+        const SizedBox(height: 12),
+        _buildInfoCard(
+          icon: Icons.phone,
+          label: 'Phone',
+          value: userData['phone'] ?? 'Not provided',
+          isDarkMode: isDarkMode,
+        ),
+        const SizedBox(height: 8),
+        _buildInfoCard(
+          icon: Icons.email,
+          label: 'Email',
+          value: userData['email'] ?? 'Not provided',
+          isDarkMode: isDarkMode,
+        ),
+        const SizedBox(height: 8),
+        _buildInfoCard(
+          icon: Icons.location_on,
+          label: 'Location',
+          value: userData['location'] ?? 'Not provided',
+          isDarkMode: isDarkMode,
+        ),
+
+        const SizedBox(height: 24),
+
+        // Additional sections - yaha aap apne profile screen ka content add kar sakte ho
+        _buildSectionTitle('Skills', Icons.psychology),
+        const SizedBox(height: 12),
+        _buildSkillsSection(userData['skills'] as List<dynamic>? ?? []),
+
+        const SizedBox(height: 24),
+
+        _buildSectionTitle('Experience', Icons.work),
+        const SizedBox(height: 12),
+        Text(
+          userData['experience'] ?? 'No experience added',
+          style: TextStyle(
+            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        _buildSectionTitle('Education', Icons.school),
+        const SizedBox(height: 12),
+        Text(
+          userData['education'] ?? 'No education added',
+          style: TextStyle(
+            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+          ),
+        ),
+
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: const Color(0xFFFF2D55),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isDarkMode,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey[850] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF007AFF).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: const Color(0xFF007AFF),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildSkillsSection(List<dynamic> skills) {
+    if (skills.isEmpty) {
+      return Text(
+        'No skills added',
+        style: TextStyle(
+          color: Colors.grey[600],
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: skills.map((skill) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF007AFF).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFF007AFF).withOpacity(0.3),
+            ),
+          ),
+          child: Text(
+            skill.toString(),
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF007AFF),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   void _updateApplicationStatus(Application application) {
-    // TODO: Implement update application status
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Update Status'),
+        title: Text('Update Application Status'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildStatusOption('Pending', ApplicationStatus.applied, application),
+              _buildStatusOption('In Review', ApplicationStatus.inProcess, application),
+              _buildStatusOption('Shortlisted', ApplicationStatus.shortlisted, application),
+              _buildStatusOption('Hired', ApplicationStatus.completed, application),
+              _buildStatusOption('Rejected', ApplicationStatus.rejected, application),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.settings, color: Colors.blue),
+                title: const Text('Manage Rounds'),
+                subtitle: const Text('Add, Edit, or Remove Interview Rounds'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showManageRoundsDialog(application);
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusOption(String label, ApplicationStatus status, Application application) {
+    final isCurrentStatus = application.status == status;
+    return ListTile(
+      leading: Icon(
+        isCurrentStatus ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+        color: isCurrentStatus ? const Color(0xFFFF2D55) : null,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isCurrentStatus ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      onTap: () async {
+        try {
+          await _firestore.collection('applications').doc(application.id).update({
+            'status': status.name,
+          });
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Status updated to $label'),
+              backgroundColor: const Color(0xFF34C759),
+            ),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update status'),
+              backgroundColor: const Color(0xFFFF3B30),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  // 🚀 NEW: Manage Rounds Dialog
+  void _showManageRoundsDialog(Application application) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Manage Interview Rounds'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ...application.rounds.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final round = entry.value;
+                    return ListTile(
+                      title: Text(round.name),
+                      subtitle: Text(
+                        round.status.name.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: _getRoundStatusColor(round.status),
+                        ),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Change Status Button
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 20, color: Colors.blue),
+                            onPressed: () => _updateRoundStatus(application, index),
+                          ),
+                          // Delete Button
+                          IconButton(
+                            icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                            onPressed: () async {
+                              final updatedRounds = List<InterviewRound>.from(application.rounds);
+                              updatedRounds.removeAt(index);
+                              
+                              await _firestore.collection('applications').doc(application.id).update({
+                                'rounds': updatedRounds.map((r) => r.toMap()).toList(),
+                              });
+                              
+                              // Refresh local state (hacky but works for dialog)
+                              application.rounds.removeAt(index);
+                              setState(() {}); 
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _showAddRoundDialog(application),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Round'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF2D55),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper to get color for round status
+  Color _getRoundStatusColor(RoundStatus status) {
+    switch (status) {
+      case RoundStatus.completed: return Colors.green;
+      case RoundStatus.current: return const Color(0xFFFF2D55);
+      case RoundStatus.upcoming: return Colors.grey;
+      case RoundStatus.rejected: return Colors.red;
+    }
+  }
+
+  // Add New Round
+  void _showAddRoundDialog(Application application) {
+    final TextEditingController roundNameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Round'),
+        content: TextField(
+          controller: roundNameController,
+          decoration: const InputDecoration(
+            labelText: 'Round Name (e.g., Coding Round 2)',
+            hintText: 'Enter round name',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (roundNameController.text.isNotEmpty) {
+                final newRound = InterviewRound(
+                  name: roundNameController.text.trim(),
+                  status: RoundStatus.upcoming,
+                );
+                
+                final updatedRounds = List<InterviewRound>.from(application.rounds)..add(newRound);
+                
+                await _firestore.collection('applications').doc(application.id).update({
+                  'rounds': updatedRounds.map((r) => r.toMap()).toList(),
+                });
+                
+                Navigator.pop(context); // Close Add Dialog
+                Navigator.pop(context); // Close Manage Dialog (force refresh)
+                _showManageRoundsDialog(Application(
+                  // Re-construct application with new rounds to refresh UI
+                  // Ideally we should use a Stream or Provider, but this mimics a quick refresh
+                  id: application.id,
+                  recruiterId: application.recruiterId,
+                  jobSeekerName: application.jobSeekerName,
+                  jobTitle: application.jobTitle,
+                  company: application.company,
+                  companyLogo: application.companyLogo,
+                  appliedDate: application.appliedDate,
+                  status: application.status,
+                  currentStage: application.currentStage,
+                  nextRound: application.nextRound,
+                  rounds: updatedRounds, // UPDATED
+                  userId: application.userId,
+                ));
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Update Round Status
+  void _updateRoundStatus(Application application, int index) {
+      showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Update Status: ${application.rounds[index].name}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            ...ApplicationStatus.values.map((status) {
-              return ListTile(
-                title: Text(_getStatusText(status)),
-                onTap: () {
-                  // Update status in Firestore
-                  _firestore.collection('applications').doc(application.id).update({
-                    'status': status.name,
-                  });
-                  Navigator.pop(context);
-                },
-              );
-            }).toList(),
-          ],
+          children: RoundStatus.values.map((status) {
+            return ListTile(
+              title: Text(status.name.toUpperCase()),
+              onTap: () async {
+                final updatedRounds = List<InterviewRound>.from(application.rounds);
+                // Create new round instance with updated status
+                updatedRounds[index] = InterviewRound(
+                  name: updatedRounds[index].name,
+                  status: status,
+                  date: updatedRounds[index].date,
+                );
+
+                await _firestore.collection('applications').doc(application.id).update({
+                  'rounds': updatedRounds.map((r) => r.toMap()).toList(),
+                });
+
+                Navigator.pop(context); // Close status selector
+                Navigator.pop(context); // Close list (refresh)
+                 _showManageRoundsDialog(Application(
+                  id: application.id,
+                  recruiterId: application.recruiterId,
+                  jobSeekerName: application.jobSeekerName,
+                  jobTitle: application.jobTitle,
+                  company: application.company,
+                  companyLogo: application.companyLogo,
+                  appliedDate: application.appliedDate,
+                  status: application.status,
+                  currentStage: application.currentStage,
+                  nextRound: application.nextRound,
+                  rounds: updatedRounds, // UPDATED
+                  userId: application.userId,
+                ));
+              },
+            );
+          }).toList(),
         ),
       ),
     );
@@ -550,6 +1052,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
         return 'Pending';
       case ApplicationStatus.inProcess:
         return 'In Review';
+      case ApplicationStatus.shortlisted:
+        return 'Shortlisted';
       case ApplicationStatus.completed:
         return 'Hired';
       case ApplicationStatus.rejected:
@@ -645,7 +1149,6 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
   }
 
   Widget _buildApplicationCard(Application application, bool isDarkMode, ThemeData theme) {
-    // Dynamically calculate current stage and next round
     final currentStage = _getCurrentStage(application);
     final nextRound = _getNextRound(application);
 
@@ -666,53 +1169,45 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with Company Info and Status
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF2D55).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: Text(
+                      application.companyLogo,
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF2D55).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
+                      Text(
+                        application.jobTitle,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: theme.textTheme.bodyLarge?.color,
                         ),
-                        child: Center(
-                          child: Text(
-                            application.companyLogo,
-                            style: const TextStyle(fontSize: 20),
-                          ),
-                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              application.jobTitle,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: theme.textTheme.bodyLarge?.color,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              application.company,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                      Text(
+                        application.company,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -721,17 +1216,10 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
                 _buildStatusBadge(application.status, isDarkMode),
               ],
             ),
-
             const SizedBox(height: 16),
-
-            // Progress Timeline
             _buildProgressTimeline(application, isDarkMode),
-
             const SizedBox(height: 16),
-
-            // Current Stage and Next Round - Now Dynamic
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Column(
@@ -768,6 +1256,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
                           fontSize: 12,
                           color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                         ),
+                        textAlign: TextAlign.end,
                       ),
                       Text(
                         nextRound,
@@ -778,16 +1267,14 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-
             const SizedBox(height: 12),
-
-            // Applied Date
             Row(
               children: [
                 Icon(
@@ -796,11 +1283,15 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
                   color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  'Applied ${DateFormat('MMM dd, yyyy').format(application.appliedDate)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                Flexible(
+                  child: Text(
+                    'Applied ${DateFormat('MMM dd, yyyy').format(application.appliedDate)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -878,6 +1369,11 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
         textColor = const Color(0xFFFFB800);
         text = 'In Process';
         break;
+      case ApplicationStatus.shortlisted:  // ADD THIS CASE
+        backgroundColor = const Color(0xFF5856D6).withOpacity(0.1);
+        textColor = const Color(0xFF5856D6);
+        text = 'Shortlisted';
+        break;
       case ApplicationStatus.completed:
         backgroundColor = const Color(0xFF34C759).withOpacity(0.1);
         textColor = const Color(0xFF34C759);
@@ -910,56 +1406,48 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
   Widget _buildProgressTimeline(Application application, bool isDarkMode) {
     return Column(
       children: [
-        // Progress Bar
         Container(
           height: 4,
           decoration: BoxDecoration(
             color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
             borderRadius: BorderRadius.circular(2),
           ),
-          child: Row(
-            children: [
-              // Calculate completed percentage
-              Expanded(
-                flex: _calculateCompletedRounds(application),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _getProgressColor(application.status),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: application.rounds.length - _calculateCompletedRounds(application),
-                child: const SizedBox(),
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final completed = _calculateCompletedRounds(application);
+              final total = application.rounds.length;
+              return Row(
+                children: [
+                  if (completed > 0)
+                    Container(
+                      width: constraints.maxWidth * (completed / total),
+                      decoration: BoxDecoration(
+                        color: _getProgressColor(application.status),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 8),
-
-        // Round Indicators
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: application.rounds.map((round) {
-            return _buildRoundIndicator(round, isDarkMode);
-          }).toList(),
+          children: application.rounds.map((r) => _buildRoundIndicator(r, isDarkMode)).toList(),
         ),
-
-        // Round Names
         const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: application.rounds.map((round) {
-            return SizedBox(
-              width: 60,
+          children: application.rounds.map((r) {
+            return Flexible(
               child: Text(
-                round.name.split(' ').first,
+                r.name.split(' ').first,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 10,
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                  fontWeight: round.status == RoundStatus.current ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: r.status == RoundStatus.current ? FontWeight.bold : FontWeight.normal,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1027,6 +1515,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
         return const Color(0xFF007AFF);
       case ApplicationStatus.inProcess:
         return const Color(0xFFFFB800);
+      case ApplicationStatus.shortlisted:  // ADD THIS CASE
+        return const Color(0xFF5856D6);
       case ApplicationStatus.completed:
         return const Color(0xFF34C759);
       case ApplicationStatus.rejected:
@@ -1117,7 +1607,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
 }
 
 // Data Models with Firestore Support
-enum ApplicationStatus { applied, inProcess, completed, rejected }
+enum ApplicationStatus { applied, inProcess, completed, rejected, shortlisted }
 enum RoundStatus { completed, current, upcoming, rejected }
 
 class Application {
@@ -1166,8 +1656,8 @@ class Application {
           ?.map((round) => InterviewRound.fromMap(round as Map<String, dynamic>))
           .toList() ?? [],
       userId: data['userId'] ?? '',
-      recruiterId: data['recruiterId'] as String?, // ADD THIS
-      jobSeekerName: data['jobSeekerName'] as String?, // ADD THIS
+      recruiterId: data['recruiterId'] as String?,
+      jobSeekerName: data['jobSeekerName'] ?? data['userName'] ?? data['userEmail'] as String?,
     );
   }
 
@@ -1177,6 +1667,8 @@ class Application {
         return ApplicationStatus.applied;
       case 'inProcess':
         return ApplicationStatus.inProcess;
+      case 'shortlisted':
+        return ApplicationStatus.shortlisted;
       case 'completed':
         return ApplicationStatus.completed;
       case 'rejected':

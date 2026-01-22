@@ -40,7 +40,11 @@ void main() async {
         print('🔔 Initializing Notification Service...');
         final notificationService = NotificationService();
         await notificationService.initialize();
-        print('✅ Notification Service ready');
+        
+        // ✅ CRITICAL FIX: Setup auth listener to save token on login
+        notificationService.setupAuthListener();
+        
+        print('✅ Notification Service ready with auth listener');
         final fcmToken = await FirebaseMessaging.instance.getToken();
         print('🔥🔥🔥 FCM TOKEN: $fcmToken 🔥🔥🔥');
       } catch (e) {

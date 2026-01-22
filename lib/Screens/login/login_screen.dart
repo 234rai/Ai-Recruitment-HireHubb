@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'signup_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../services/google_auth_service.dart';
+import '../../services/notification_service.dart';
 import '../../navigation/main_navigation_screen.dart';
 import 'forgot_password_screen.dart';
 import 'package:major_project/providers/role_provider.dart';
 import 'package:provider/provider.dart';
+import '../../utils/responsive_helper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -85,6 +88,20 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           await roleProvider.refreshUser();
 
           print('🔐 Login: Role refreshed - ${roleProvider.userRole?.displayName}');
+
+          // ✅ CRITICAL FIX: Explicitly save FCM token after login (defense in depth)
+          try {
+            final notificationService = NotificationService();
+            final token = await FirebaseMessaging.instance.getToken();
+            if (token != null) {
+              await notificationService.saveTokenAfterLogin(token);
+              print('✅ FCM token saved after email login');
+            } else {
+              print('⚠️ FCM token is null after email login');
+            }
+          } catch (e) {
+            print('❌ Error saving FCM token after email login: $e');
+          }
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -180,6 +197,20 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           await roleProvider.forceRefresh();
 
           print('✅ Role loaded: ${roleProvider.userRole?.displayName}');
+
+          // ✅ CRITICAL FIX: Explicitly save FCM token after Google login (defense in depth)
+          try {
+            final notificationService = NotificationService();
+            final token = await FirebaseMessaging.instance.getToken();
+            if (token != null) {
+              await notificationService.saveTokenAfterLogin(token);
+              print('✅ FCM token saved after Google login');
+            } else {
+              print('⚠️ FCM token is null after Google login');
+            }
+          } catch (e) {
+            print('❌ Error saving FCM token after Google login: $e');
+          }
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -416,7 +447,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(context.responsive.padding(24)),
           child: AnimatedBuilder(
             animation: _animationController,
             builder: (context, child) {
@@ -456,8 +487,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutBack,
-          width: 80,
-          height: 80,
+          width: context.responsive.width(80),
+          height: context.responsive.height(80),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFFFF2D55), Color(0xFFFF6B9D)],
@@ -473,10 +504,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               ),
             ],
           ),
-          child: const Icon(
+          child: Icon(
             Icons.work_outline,
             color: Colors.white,
-            size: 40,
+            size: context.responsive.iconSize(40),
           ),
         ),
 
@@ -485,7 +516,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         Text(
           'Welcome Back',
           style: TextStyle(
-            fontSize: 32,
+            fontSize: context.responsive.fontSize(32),
             fontWeight: FontWeight.bold,
             color: isDarkMode ? Colors.white : Colors.black,
           ),
@@ -496,7 +527,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         Text(
           'Sign in to your HireHubb account',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: context.responsive.fontSize(16),
             color: isDarkMode ? Colors.grey.shade400 : Colors.grey,
           ),
         ),

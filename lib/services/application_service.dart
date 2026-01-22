@@ -59,15 +59,17 @@ class ApplicationService {
         };
       }).toList();
 
+      final trimmedJobId = jobId.trim();
+
       // Create application document
       final applicationData = {
         'userId': userId,
-        'userName': userName, // 🚀 NEW
-        'jobId': jobId,
+        'userName': userName,
+        'jobId': trimmedJobId,  // ← Use trimmed ID
         'jobTitle': jobTitle,
         'company': company,
         'companyLogo': companyLogo,
-        'recruiterId': recruiterId, // 🚀 NEW - CRITICAL FOR NOTIFICATIONS
+        'recruiterId': recruiterId,
         'appliedDate': Timestamp.fromDate(DateTime.now()),
         'status': 'applied',
         'currentStage': rounds.first,
@@ -77,14 +79,20 @@ class ApplicationService {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // ✅ FIXED: Save application and get the document reference
+      // ✅ Save application
       final applicationDocRef = await _firestore.collection('applications').add(applicationData);
       final applicationId = applicationDocRef.id;
 
-      // Update job document to increment application count
-      await _firestore.collection('jobs').doc(jobId).update({
-        'applicationsCount': FieldValue.increment(1),
-      });
+      // 🔍 DEBUG: Check if saved
+      print('✅ Application saved with ID: $applicationId');
+      print('🔍 JobId used: $trimmedJobId');
+
+      // ✅ Verify application was saved
+      final verifyApp = await _firestore
+          .collection('applications')
+          .where('jobId', isEqualTo: trimmedJobId)
+          .get();
+      print('📊 Total applications for job $trimmedJobId: ${verifyApp.docs.length}');
 
       // ✅ FIXED: Create conversation after saving the application
       final conversationId = await _messagingService.getOrCreateConversation(

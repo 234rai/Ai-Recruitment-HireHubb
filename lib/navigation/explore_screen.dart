@@ -5,10 +5,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../providers/role_provider.dart';
 import '../models/job_model.dart';
-import 'package:intl/intl.dart';
 import '../services/firestore_service.dart';
 import '../services/application_service.dart';
 import 'job_detail_screen.dart';
+import '../utils/responsive_helper.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -281,6 +281,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _searchMode = 'people';
     }
 
+    ResponsiveHelper responsive = ResponsiveHelper(context);
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -289,46 +291,51 @@ class _ExploreScreenState extends State<ExploreScreen> {
           children: [
             // Header with Search
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              padding: EdgeInsets.fromLTRB(
+                responsive.padding(16), 
+                responsive.padding(16), 
+                responsive.padding(16), 
+                responsive.padding(12)
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     roleProvider.isRecruiter ? 'Find Candidates' : 'Explore',
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: responsive.fontSize(24),
                       fontWeight: FontWeight.bold,
                       color: isDarkMode ? Colors.white : Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: responsive.height(16)),
 
                   // Expanded Search Bar
-                  _buildExpandedSearchBar(isDarkMode, roleProvider),
+                  _buildExpandedSearchBar(isDarkMode, roleProvider, responsive),
                 ],
               ),
             ),
 
             // Active Filters Summary
-            _buildActiveFiltersSummary(isDarkMode),
+            _buildActiveFiltersSummary(isDarkMode, responsive),
 
-            const SizedBox(height: 12),
+            SizedBox(height: responsive.height(12)),
 
             // Results header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildResultsHeader(isDarkMode, roleProvider),
+              padding: EdgeInsets.symmetric(horizontal: responsive.padding(16)),
+              child: _buildResultsHeader(isDarkMode, roleProvider, responsive),
             ),
 
-            const SizedBox(height: 12),
+            SizedBox(height: responsive.height(12)),
 
             // Content List - ROLE-BASED CONTENT
             Expanded(
               child: roleProvider.isRecruiter
-                  ? _buildCandidatesList(isDarkMode)
+                  ? _buildCandidatesList(isDarkMode, responsive)
                   : (_searchMode == 'jobs'
-                  ? _buildJobsListFromFirestore(isDarkMode)
-                  : _buildUsersListFromFirestore(isDarkMode)),
+                  ? _buildJobsListFromFirestore(isDarkMode, responsive)
+                  : _buildUsersListFromFirestore(isDarkMode, responsive)),
             ),
           ],
         ),
@@ -336,22 +343,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildExpandedSearchBar(bool isDarkMode, RoleProvider roleProvider) {
+  Widget _buildExpandedSearchBar(bool isDarkMode, RoleProvider roleProvider, ResponsiveHelper responsive) {
     return Row(
       children: [
         // Search Field
         Expanded(
           child: Container(
-            height: 50,
+            height: responsive.height(50),
             decoration: BoxDecoration(
               color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(responsive.radius(12)),
             ),
             child: TextField(
               controller: _searchController,
               style: TextStyle(
                 color: isDarkMode ? Colors.white : Colors.black,
-                fontSize: 16,
+                fontSize: responsive.fontSize(16),
               ),
               decoration: InputDecoration(
                 hintText: roleProvider.isRecruiter
@@ -359,19 +366,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     : 'Search jobs, people, companies...',
                 hintStyle: TextStyle(
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                  fontSize: 16,
+                  fontSize: responsive.fontSize(16),
                 ),
                 prefixIcon: Icon(
                   Icons.search,
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                  size: 22,
+                  size: responsive.iconSize(22),
                 ),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                   icon: Icon(
                     Icons.clear,
                     color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    size: 20,
+                    size: responsive.iconSize(20),
                   ),
                   onPressed: () {
                     _searchController.clear();
@@ -380,7 +387,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 )
                     : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                contentPadding: EdgeInsets.symmetric(
+                    horizontal: responsive.padding(16), 
+                    vertical: responsive.padding(14)
+                ),
               ),
               onChanged: (value) {
                 setState(() {});
@@ -389,7 +399,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
         ),
 
-        const SizedBox(width: 12),
+        SizedBox(width: responsive.width(12)),
 
         // Filter Button
         GestureDetector(
@@ -397,15 +407,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ? _showRecruiterFilterBottomSheet()
               : _showFilterBottomSheet(),
           child: Container(
-            height: 50,
-            width: 50,
+            height: responsive.height(50),
+            width: responsive.height(50),
             decoration: BoxDecoration(
               color: const Color(0xFFFF2D55),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(responsive.radius(12)),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.filter_list,
-              size: 22,
+              size: responsive.iconSize(22),
               color: Colors.white,
             ),
           ),
@@ -414,7 +424,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildActiveFiltersSummary(bool isDarkMode) {
+  Widget _buildActiveFiltersSummary(bool isDarkMode, ResponsiveHelper responsive) {
     final List<String> activeFilters = [];
 
     // Add search mode
@@ -451,29 +461,32 @@ class _ExploreScreenState extends State<ExploreScreen> {
     if (activeFilters.isEmpty) return const SizedBox();
 
     return SizedBox(
-      height: 40,
+      height: responsive.height(40),
       child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.symmetric(horizontal: responsive.padding(16)),
         scrollDirection: Axis.horizontal,
         children: [
           // Clear All button
           Container(
-            margin: const EdgeInsets.only(right: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            margin: EdgeInsets.only(right: responsive.width(8)),
+            padding: EdgeInsets.symmetric(
+                horizontal: responsive.padding(12), 
+                vertical: responsive.padding(6)
+            ),
             decoration: BoxDecoration(
               color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(responsive.radius(20)),
             ),
             child: GestureDetector(
               onTap: _clearAllFilters,
               child: Row(
                 children: [
-                  Icon(Icons.clear_all, size: 14, color: isDarkMode ? Colors.white : Colors.black),
-                  const SizedBox(width: 4),
+                  Icon(Icons.clear_all, size: responsive.iconSize(14), color: isDarkMode ? Colors.white : Colors.black),
+                  SizedBox(width: responsive.width(4)),
                   Text(
                     'Clear All',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: responsive.fontSize(12),
                       color: isDarkMode ? Colors.white : Colors.black,
                     ),
                   ),
@@ -483,27 +496,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
           // Active filters
           ...activeFilters.map((filter) => Container(
-            margin: const EdgeInsets.only(right: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            margin: EdgeInsets.only(right: responsive.width(8)),
+            padding: EdgeInsets.symmetric(
+                horizontal: responsive.padding(12), 
+                vertical: responsive.padding(6)
+            ),
             decoration: BoxDecoration(
               color: const Color(0xFFFF2D55).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(responsive.radius(20)),
               border: Border.all(color: const Color(0xFFFF2D55).withOpacity(0.3)),
             ),
             child: Row(
               children: [
                 Text(
                   filter,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFFFF2D55),
+                  style: TextStyle(
+                    fontSize: responsive.fontSize(12),
+                    color: const Color(0xFFFF2D55),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: responsive.width(4)),
                 GestureDetector(
                   onTap: () => _removeFilter(filter),
-                  child: Icon(Icons.close, size: 14, color: const Color(0xFFFF2D55)),
+                  child: Icon(Icons.close, size: responsive.iconSize(14), color: const Color(0xFFFF2D55)),
                 ),
               ],
             ),
@@ -544,7 +560,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     });
   }
 
-  Widget _buildResultsHeader(bool isDarkMode, RoleProvider roleProvider) {
+  Widget _buildResultsHeader(bool isDarkMode, RoleProvider roleProvider, ResponsiveHelper responsive) {
     return StreamBuilder<QuerySnapshot>(
       stream: roleProvider.isRecruiter
           ? _candidatesStream
@@ -563,7 +579,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             Text(
               resultText,
               style: TextStyle(
-                fontSize: 15,
+                fontSize: responsive.fontSize(15),
                 fontWeight: FontWeight.w600,
                 color: isDarkMode ? Colors.white : Colors.black,
               ),
@@ -574,7 +590,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ? 'Showing candidates'
                     : 'Showing ${_searchMode == 'jobs' ? 'jobs' : 'people'}',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: responsive.fontSize(12),
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
               ),
@@ -584,7 +600,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildCandidatesList(bool isDarkMode) {
+  Widget _buildCandidatesList(bool isDarkMode, ResponsiveHelper responsive) {
     return StreamBuilder<QuerySnapshot>(
       stream: _candidatesStream,
       builder: (context, snapshot) {
@@ -606,25 +622,25 @@ class _ExploreScreenState extends State<ExploreScreen> {
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState(isDarkMode, isRecruiter: true);
+          return _buildEmptyState(isDarkMode, responsive: responsive, isRecruiter: true);
         }
 
         final candidates = snapshot.data!.docs;
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: responsive.padding(16)),
           itemCount: candidates.length,
           itemBuilder: (context, index) {
             final doc = candidates[index];
             final candidate = doc.data() as Map<String, dynamic>;
-            return _buildCandidateCard(doc.id, candidate, isDarkMode);
+            return _buildCandidateCard(doc.id, candidate, isDarkMode, responsive);
           },
         );
       },
     );
   }
 
-  Widget _buildJobsListFromFirestore(bool isDarkMode) {
+  Widget _buildJobsListFromFirestore(bool isDarkMode, ResponsiveHelper responsive) {
     return StreamBuilder<QuerySnapshot>(
       stream: _jobsStream,
       builder: (context, snapshot) {
@@ -646,7 +662,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState(isDarkMode);
+          return _buildEmptyState(isDarkMode, responsive: responsive);
         }
 
         final jobs = snapshot.data!.docs;
@@ -664,13 +680,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: responsive.padding(16)),
           itemCount: filteredJobs.length,
           itemBuilder: (context, index) {
             final doc = filteredJobs[index];
             final jobData = doc.data() as Map<String, dynamic>;
 
-            // Convert Firestore document to Job model - FIXED with all required fields
+            // ✅ FIXED: Convert Firestore document to Job model
             final job = Job(
               id: doc.id,
               position: jobData['position'] ?? '',
@@ -684,13 +700,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
               skills: jobData['skills'] is List
                   ? List<String>.from(jobData['skills'])
                   : [],
-              postedTime: _getTimeAgo((jobData['postedAt'] as Timestamp).toDate()),
+              // ❌ REMOVE THIS LINE: postedTime: _getTimeAgo((jobData['postedAt'] as Timestamp).toDate()),
+              postedAt: jobData['postedAt'] as Timestamp?, // ✅ ADD THIS - Pass the timestamp
               isFeatured: jobData['isFeatured'] ?? false,
               recruiterId: jobData['recruiterId'] ?? '',
-              // ADDING NEW REQUIRED FIELDS:
               companyDescription: jobData['companyDescription'] ?? '',
               description: jobData['description'] ?? '',
-              postedAt: jobData['postedAt'] as Timestamp,
               requirements: jobData['requirements'] is List
                   ? List<String>.from(jobData['requirements'])
                   : [],
@@ -698,16 +713,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ? List<String>.from(jobData['searchKeywords'])
                   : [],
               type: jobData['type'] ?? 'Full-time',
+              jobType: jobData['jobType'] ?? jobData['type'] ?? 'Full-time',
+              status: jobData['status'] ?? 'active',
+              applications: jobData['applications'] ?? 0,
             );
 
-            return _buildJobCard(job, isDarkMode);
+            return _buildJobCard(job, isDarkMode, responsive);
           },
         );
       },
     );
   }
 
-  Widget _buildUsersListFromFirestore(bool isDarkMode) {
+  Widget _buildUsersListFromFirestore(bool isDarkMode, ResponsiveHelper responsive) {
     return StreamBuilder<QuerySnapshot>(
       stream: _usersStream,
       builder: (context, snapshot) {
@@ -729,13 +747,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState(isDarkMode);
+          return _buildEmptyState(isDarkMode, responsive: responsive);
         }
 
         final users = snapshot.data!.docs;
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: responsive.padding(16)),
           itemCount: users.length,
           itemBuilder: (context, index) {
             final doc = users[index];
@@ -743,49 +761,52 @@ class _ExploreScreenState extends State<ExploreScreen> {
             if (doc.id == _auth.currentUser?.uid) {
               return const SizedBox.shrink();
             }
-            return _buildUserCard(doc.id, user, isDarkMode);
+            return _buildUserCard(doc.id, user, isDarkMode, responsive);
           },
         );
       },
     );
   }
 
-  Widget _buildEmptyState(bool isDarkMode, {bool isRecruiter = false}) {
+  Widget _buildEmptyState(bool isDarkMode, {bool isRecruiter = false, required ResponsiveHelper responsive}) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Icons.search_off,
-            size: 56,
+            size: responsive.iconSize(56),
             color: Colors.grey.shade400,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: responsive.height(12)),
           Text(
             isRecruiter ? 'No candidates found'
                 : (_searchMode == 'jobs' ? 'No jobs found' : 'No people found'),
             style: TextStyle(
-              fontSize: 16,
+              fontSize: responsive.fontSize(16),
               fontWeight: FontWeight.w500,
               color: Colors.grey.shade400,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: responsive.height(6)),
           Text(
             'Try adjusting your filters',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: responsive.fontSize(13),
               color: Colors.grey.shade500,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: responsive.height(16)),
           ElevatedButton(
             onPressed: _clearAllFilters,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFF2D55),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                  horizontal: responsive.padding(24), 
+                  vertical: responsive.padding(12)
+              ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(responsive.radius(10)),
               ),
             ),
             child: const Text(
@@ -799,15 +820,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   // UPDATED: Job Card with save and apply functionality
-  Widget _buildJobCard(Job job, bool isDarkMode) {
+  // UPDATED: Job Card with save and apply functionality
+  Widget _buildJobCard(Job job, bool isDarkMode, ResponsiveHelper responsive) {
     return GestureDetector(
       onTap: () => _showJobDetails(job),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
+        margin: EdgeInsets.only(bottom: responsive.height(12)),
+        padding: EdgeInsets.all(responsive.padding(14)),
         decoration: BoxDecoration(
           color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(responsive.radius(14)),
           boxShadow: [
             if (!isDarkMode)
               BoxShadow(
@@ -824,24 +846,24 @@ class _ExploreScreenState extends State<ExploreScreen> {
               children: [
                 // Logo
                 Container(
-                  width: 38,
-                  height: 38,
+                  width: responsive.width(38),
+                  height: responsive.width(38),
                   decoration: BoxDecoration(
                     color: Color(job.logoColor).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(responsive.radius(10)),
                   ),
                   child: Center(
                     child: Text(
                       job.logo.isNotEmpty ? job.logo : job.company.isNotEmpty ? job.company[0].toUpperCase() : 'C',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: responsive.fontSize(16),
                         fontWeight: FontWeight.bold,
                         color: Color(job.logoColor),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: responsive.width(10)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -849,18 +871,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       Text(
                         job.position,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: responsive.fontSize(15),
                           fontWeight: FontWeight.w600,
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: responsive.height(2)),
                       Text(
                         job.company,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: responsive.fontSize(13),
                           color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                         ),
                         maxLines: 1,
@@ -877,14 +899,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     return GestureDetector(
                       onTap: () => isSaved ? _unsaveJob(job.id) : _saveJob(job.id),
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: EdgeInsets.all(responsive.padding(8)),
                         decoration: BoxDecoration(
                           color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(responsive.radius(8)),
                         ),
                         child: Icon(
                           isSaved ? Icons.bookmark : Icons.bookmark_outline,
-                          size: 20,
+                          size: responsive.iconSize(20),
                           color: isSaved
                               ? const Color(0xFFFF2D55)
                               : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
@@ -895,26 +917,29 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: responsive.height(10)),
 
             // Location and Type
             Wrap(
-              spacing: 8,
-              runSpacing: 6,
+              spacing: responsive.width(8),
+              runSpacing: responsive.height(6),
               children: [
-                _buildInfoChip(Icons.location_on_outlined, job.country, isDarkMode),
+                _buildInfoChip(Icons.location_on_outlined, job.country, isDarkMode, responsive),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: responsive.padding(8), 
+                      vertical: responsive.padding(4)
+                  ),
                   decoration: BoxDecoration(
                     color: job.isRemote
                         ? const Color(0xFF10B981).withOpacity(0.1)
                         : Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(responsive.radius(6)),
                   ),
                   child: Text(
                     job.location,
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: responsive.fontSize(10),
                       fontWeight: FontWeight.w600,
                       color: job.isRemote ? const Color(0xFF10B981) : Colors.orange,
                     ),
@@ -925,21 +950,24 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
             // Skills
             if (job.skills.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              SizedBox(height: responsive.height(8)),
               Wrap(
-                spacing: 6,
-                runSpacing: 6,
+                spacing: responsive.width(6),
+                runSpacing: responsive.height(6),
                 children: job.skills.take(3).map((skill) {
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: responsive.padding(8), 
+                        vertical: responsive.padding(4)
+                    ),
                     decoration: BoxDecoration(
                       color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(responsive.radius(6)),
                     ),
                     child: Text(
                       skill,
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: responsive.fontSize(10),
                         color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700,
                       ),
                     ),
@@ -948,7 +976,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ],
 
-            const SizedBox(height: 10),
+            SizedBox(height: responsive.height(10)),
 
             // Salary, Time, and Apply Button
             Row(
@@ -958,16 +986,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   children: [
                     Icon(
                       Icons.paid_outlined,
-                      size: 14,
+                      size: responsive.iconSize(14),
                       color: const Color(0xFFFF2D55),
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: responsive.width(4)),
                     Text(
                       job.salary,
-                      style: const TextStyle(
-                        fontSize: 13,
+                      style: TextStyle(
+                        fontSize: responsive.fontSize(13),
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFFFF2D55),
+                        color: const Color(0xFFFF2D55),
                       ),
                     ),
                   ],
@@ -977,11 +1005,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     Text(
                       job.postedTime,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: responsive.fontSize(11),
                         color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: responsive.width(12)),
                     // Apply Button
                     FutureBuilder<bool>(
                       future: _applicationService.hasApplied(job.id),
@@ -990,27 +1018,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         return GestureDetector(
                           onTap: hasApplied ? null : () => _applyForJob(job),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: responsive.padding(16), 
+                                vertical: responsive.padding(8)
+                            ),
                             decoration: BoxDecoration(
                               color: hasApplied
                                   ? const Color(0xFF34C759)
                                   : const Color(0xFFFF2D55),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(responsive.radius(8)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   hasApplied ? Icons.check : Icons.send,
-                                  size: 14,
+                                  size: responsive.iconSize(14),
                                   color: Colors.white,
                                 ),
-                                const SizedBox(width: 4),
+                                SizedBox(width: responsive.width(4)),
                                 Text(
                                   hasApplied ? 'Applied' : 'Apply',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 12,
+                                    fontSize: responsive.fontSize(12),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -1030,7 +1061,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildCandidateCard(String userId, Map<String, dynamic> candidate, bool isDarkMode) {
+  Widget _buildCandidateCard(String userId, Map<String, dynamic> candidate, bool isDarkMode, ResponsiveHelper responsive) {
     final name = candidate['name']?.toString().trim() ?? 'Unknown Candidate';
     final title = candidate['title']?.toString().trim() ?? 'No title';
     final skills = candidate['skills'] is List
@@ -1043,11 +1074,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return GestureDetector(
       onTap: () => _showCandidateProfile(userId, candidate, isDarkMode),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
+        margin: EdgeInsets.only(bottom: responsive.height(12)),
+        padding: EdgeInsets.all(responsive.padding(14)),
         decoration: BoxDecoration(
           color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(responsive.radius(14)),
           boxShadow: [
             if (!isDarkMode)
               BoxShadow(
@@ -1063,17 +1094,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
             Row(
               children: [
                 Container(
-                  width: 45,
-                  height: 45,
+                  width: responsive.width(45),
+                  height: responsive.width(45),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFFFF2D55).withOpacity(0.1),
                   ),
                   child: candidate['profileImage'] != null
                       ? CircleAvatar(backgroundImage: NetworkImage(candidate['profileImage']!))
-                      : const Icon(Icons.person, size: 22, color: Color(0xFFFF2D55)),
+                      : Icon(Icons.person, size: responsive.iconSize(22), color: const Color(0xFFFF2D55)),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: responsive.width(12)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1081,18 +1112,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       Text(
                         name,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: responsive.fontSize(15),
                           fontWeight: FontWeight.w600,
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: responsive.height(2)),
                       Text(
                         title,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: responsive.fontSize(13),
                           color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                         ),
                         maxLines: 1,
@@ -1101,9 +1132,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          _buildInfoChip(Icons.work_outline, experience, isDarkMode),
-                          const SizedBox(width: 12),
-                          _buildInfoChip(Icons.location_on_outlined, location, isDarkMode),
+                          _buildInfoChip(Icons.work_outline, experience, isDarkMode, responsive),
+                          SizedBox(width: responsive.width(12)),
+                          _buildInfoChip(Icons.location_on_outlined, location, isDarkMode, responsive),
                         ],
                       ),
                     ],
@@ -1219,20 +1250,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String text, bool isDarkMode) {
+  Widget _buildInfoChip(IconData icon, String text, bool isDarkMode, ResponsiveHelper responsive) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           icon,
-          size: 14,
+          size: responsive.iconSize(14),
           color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
         ),
-        const SizedBox(width: 4),
+        SizedBox(width: responsive.width(4)),
         Text(
           text,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: responsive.fontSize(11),
             color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
           ),
         ),
@@ -1240,7 +1271,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildUserCard(String userId, Map<String, dynamic> user, bool isDarkMode) {
+  Widget _buildUserCard(String userId, Map<String, dynamic> user, bool isDarkMode, ResponsiveHelper responsive) {
     final name = user['name']?.toString().trim() ?? 'Unknown User';
     final title = user['title']?.toString().trim() ?? 'No title';
     final userType = user['userType']?.toString().trim() ?? 'user';
@@ -1248,11 +1279,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return GestureDetector(
       onTap: () => _showUserProfile(userId, user, isDarkMode),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
+        margin: EdgeInsets.only(bottom: responsive.height(12)),
+        padding: EdgeInsets.all(responsive.padding(14)),
         decoration: BoxDecoration(
           color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(responsive.radius(14)),
           boxShadow: [
             if (!isDarkMode)
               BoxShadow(
@@ -1265,17 +1296,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
         child: Row(
           children: [
             Container(
-              width: 45,
-              height: 45,
+              width: responsive.width(45),
+              height: responsive.width(45),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFFFF2D55).withOpacity(0.1),
               ),
               child: user['profileImage'] != null
                   ? CircleAvatar(backgroundImage: NetworkImage(user['profileImage']!))
-                  : const Icon(Icons.person, size: 22, color: Color(0xFFFF2D55)),
+                  : Icon(Icons.person, size: responsive.iconSize(22), color: const Color(0xFFFF2D55)),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: responsive.width(12)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1283,34 +1314,37 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   Text(
                     name,
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: responsive.fontSize(15),
                       fontWeight: FontWeight.w600,
                       color: isDarkMode ? Colors.white : Colors.black,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(height: responsive.height(2)),
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: responsive.fontSize(13),
                       color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: responsive.height(6)),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: responsive.padding(8), 
+                        vertical: responsive.padding(3)
+                    ),
                     decoration: BoxDecoration(
                       color: _getUserTypeColor(userType).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(responsive.radius(6)),
                     ),
                     child: Text(
                       userType.toUpperCase(),
                       style: TextStyle(
-                        fontSize: 9,
+                        fontSize: responsive.fontSize(9),
                         color: _getUserTypeColor(userType),
                         fontWeight: FontWeight.w600,
                       ),
@@ -1321,7 +1355,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              size: 14,
+              size: responsive.iconSize(14),
               color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
             ),
           ],
@@ -1349,6 +1383,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        ResponsiveHelper responsive = ResponsiveHelper(context);
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return DraggableScrollableSheet(
@@ -1359,31 +1394,31 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 return Container(
                   decoration: BoxDecoration(
                     color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(responsive.radius(20))),
                   ),
                   child: Column(
                     children: [
                       // Handle
                       Container(
-                        margin: const EdgeInsets.only(top: 10, bottom: 10),
-                        width: 40,
-                        height: 4,
+                        margin: EdgeInsets.only(top: responsive.height(10), bottom: responsive.height(10)),
+                        width: responsive.width(40),
+                        height: responsive.height(4),
                         decoration: BoxDecoration(
                           color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: BorderRadius.circular(responsive.radius(2)),
                         ),
                       ),
 
                       // Header
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: EdgeInsets.symmetric(horizontal: responsive.padding(20)),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               'Filter Candidates',
                               style: TextStyle(
-                                fontSize: 20,
+                                fontSize: responsive.fontSize(20),
                                 fontWeight: FontWeight.bold,
                                 color: Theme.of(context).colorScheme.onBackground,
                               ),
@@ -1405,10 +1440,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       const SizedBox(height: 16),
 
                       // Content
+                      // Content
                       Expanded(
                         child: SingleChildScrollView(
                           controller: scrollController,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: EdgeInsets.symmetric(horizontal: responsive.padding(20)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1421,6 +1457,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedCategory = 'All');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'Developers',
@@ -1429,6 +1466,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedCategory = 'Developers');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'Designers',
@@ -1437,6 +1475,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedCategory = 'Designers');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'Managers',
@@ -1445,6 +1484,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedCategory = 'Managers');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'Students',
@@ -1453,10 +1493,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedCategory = 'Students');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
-                              ]),
+                              ], responsive),
 
-                              const SizedBox(height: 24),
+                              SizedBox(height: responsive.height(24)),
 
                               // Skills
                               _buildFilterSection('Skills', [
@@ -1467,6 +1508,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedSkills = 'Any');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'Flutter',
@@ -1475,6 +1517,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedSkills = 'Flutter');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'React',
@@ -1483,6 +1526,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedSkills = 'React');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'UI/UX',
@@ -1491,6 +1535,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedSkills = 'UI/UX');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'Python',
@@ -1499,6 +1544,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedSkills = 'Python');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'Java',
@@ -1507,10 +1553,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedSkills = 'Java');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
-                              ]),
+                              ], responsive),
 
-                              const SizedBox(height: 24),
+                              SizedBox(height: responsive.height(24)),
 
                               // Experience Level
                               _buildFilterSection('Experience Level', [
@@ -1521,6 +1568,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedExperience = 'Any');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'Entry Level',
@@ -1529,6 +1577,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedExperience = 'Entry Level');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'Mid Level',
@@ -1537,6 +1586,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedExperience = 'Mid Level');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
                                 _buildFilterChip(
                                   'Senior Level',
@@ -1545,10 +1595,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                     setState(() => _selectedExperience = 'Senior Level');
                                     setModalState(() {});
                                   },
+                                  responsive,
                                 ),
-                              ]),
+                              ], responsive),
 
-                              const SizedBox(height: 20),
+                              SizedBox(height: responsive.height(20)),
 
                               // Additional Options
                               _buildFilterOption(
@@ -1558,6 +1609,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   setState(() => _openToWorkOnly = value!);
                                   setModalState(() {});
                                 },
+                                responsive,
                               ),
 
                               const SizedBox(height: 70),
@@ -1569,18 +1621,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       // Apply Button
                       Container(
                         padding: EdgeInsets.fromLTRB(
-                          20,
-                          10,
-                          20,
-                          MediaQuery.of(context).padding.bottom + 10,
+                          responsive.padding(20),
+                          responsive.padding(10),
+                          responsive.padding(20),
+                          MediaQuery.of(context).padding.bottom + responsive.padding(10),
                         ),
                         decoration: BoxDecoration(
                           color: Theme.of(context).scaffoldBackgroundColor,
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.05),
-                              blurRadius: 8,
-                              offset: const Offset(0, -2),
+                              blurRadius: responsive.radius(8),
+                              offset: Offset(0, -responsive.height(2)),
                             ),
                           ],
                         ),
@@ -1593,14 +1645,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             backgroundColor: const Color(0xFFFF2D55),
                             minimumSize: const Size(double.infinity, 48),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(responsive.radius(12)),
                             ),
                             elevation: 0,
                           ),
-                          child: const Text(
+                          child: Text(
                             'Apply Filters',
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: responsive.fontSize(15),
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                             ),
@@ -1624,6 +1676,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        ResponsiveHelper responsive = ResponsiveHelper(context);
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return DraggableScrollableSheet(
@@ -1634,31 +1687,31 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 return Container(
                   decoration: BoxDecoration(
                     color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(responsive.radius(20))),
                   ),
                   child: Column(
                     children: [
                       // Handle
                       Container(
-                        margin: const EdgeInsets.only(top: 10, bottom: 10),
-                        width: 40,
-                        height: 4,
+                        margin: EdgeInsets.only(top: responsive.height(10), bottom: responsive.height(10)),
+                        width: responsive.width(40),
+                        height: responsive.height(4),
                         decoration: BoxDecoration(
                           color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: BorderRadius.circular(responsive.radius(2)),
                         ),
                       ),
 
                       // Header
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: EdgeInsets.symmetric(horizontal: responsive.padding(20)),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               'Filters',
                               style: TextStyle(
-                                fontSize: 20,
+                                fontSize: responsive.fontSize(20),
                                 fontWeight: FontWeight.bold,
                                 color: Theme.of(context).colorScheme.onBackground,
                               ),
@@ -1677,13 +1730,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 16),
+                      SizedBox(height: responsive.height(16)),
 
                       // Content
                       Expanded(
                         child: SingleChildScrollView(
                           controller: scrollController,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: EdgeInsets.symmetric(horizontal: responsive.padding(20)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1692,30 +1745,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 _buildModeOption('Jobs', Icons.work_outline, _searchMode == 'jobs', () {
                                   setState(() => _searchMode = 'jobs');
                                   setModalState(() {});
-                                }),
+                                }, responsive),
                                 _buildModeOption('People', Icons.people_outline, _searchMode == 'people', () {
                                   setState(() => _searchMode = 'people');
                                   setModalState(() {});
-                                }),
-                              ]),
+                                }, responsive),
+                              ], responsive),
 
-                              const SizedBox(height: 24),
+                              SizedBox(height: responsive.height(24)),
 
                               // Categories based on search mode
                               if (_searchMode == 'jobs')
-                                _buildJobCategories(setModalState)
+                                _buildJobCategories(setModalState, responsive)
                               else
-                                _buildPeopleCategories(setModalState),
+                                _buildPeopleCategories(setModalState, responsive),
 
-                              const SizedBox(height: 24),
+                              SizedBox(height: responsive.height(24)),
 
                               // Additional filters based on search mode
                               if (_searchMode == 'jobs')
-                                ..._buildJobSpecificFilters(setModalState)
+                                ..._buildJobSpecificFilters(setModalState, responsive)
                               else
-                                ..._buildPeopleSpecificFilters(setModalState),
+                                ..._buildPeopleSpecificFilters(setModalState, responsive),
 
-                              const SizedBox(height: 70),
+                              SizedBox(height: responsive.height(70)),
                             ],
                           ),
                         ),
@@ -1724,10 +1777,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       // Apply Button
                       Container(
                         padding: EdgeInsets.fromLTRB(
-                          20,
-                          10,
-                          20,
-                          MediaQuery.of(context).padding.bottom + 10,
+                          responsive.padding(20),
+                          responsive.padding(10),
+                          responsive.padding(20),
+                          MediaQuery.of(context).padding.bottom + responsive.padding(10),
                         ),
                         decoration: BoxDecoration(
                           color: Theme.of(context).scaffoldBackgroundColor,
@@ -1746,16 +1799,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFFF2D55),
-                            minimumSize: const Size(double.infinity, 48),
+                            minimumSize: Size(double.infinity, responsive.height(48)),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(responsive.radius(12)),
                             ),
                             elevation: 0,
                           ),
-                          child: const Text(
+                          child: Text(
                             'Apply Filters',
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: responsive.fontSize(15),
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                             ),
@@ -1773,36 +1826,36 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildFilterSection(String title, List<Widget> options) {
+  Widget _buildFilterSection(String title, List<Widget> options, ResponsiveHelper responsive) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 16,
+          style: TextStyle(
+            fontSize: responsive.fontSize(16),
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: responsive.height(12)),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: responsive.width(12),
+          runSpacing: responsive.height(12),
           children: options,
         ),
       ],
     );
   }
 
-  Widget _buildModeOption(String label, IconData icon, bool isSelected, VoidCallback onTap) {
+  Widget _buildModeOption(String label, IconData icon, bool isSelected, VoidCallback onTap, ResponsiveHelper responsive) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 120,
-        padding: const EdgeInsets.all(12),
+        width: responsive.width(120),
+        padding: EdgeInsets.all(responsive.padding(12)),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFFF2D55) : Colors.grey.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(responsive.radius(12)),
           border: Border.all(
             color: isSelected ? const Color(0xFFFF2D55) : Colors.grey.withOpacity(0.3),
           ),
@@ -1812,13 +1865,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
             Icon(
               icon,
               color: isSelected ? Colors.white : Colors.grey.shade700,
-              size: 24,
+              size: responsive.iconSize(24),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: responsive.height(8)),
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: responsive.fontSize(14),
                 fontWeight: FontWeight.w500,
                 color: isSelected ? Colors.white : Colors.grey.shade700,
               ),
@@ -1829,7 +1882,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildJobCategories(StateSetter? setModalState) {
+  Widget _buildJobCategories(StateSetter? setModalState, ResponsiveHelper responsive) {
     final jobCategories = ['All', 'Tech', 'Design', 'Marketing', 'Finance', 'Remote'];
 
     return _buildFilterSection('Job Categories', [
@@ -1839,12 +1892,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
             () {
           setState(() => _selectedCategory = category);
           setModalState?.call(() {});
-        },
+        }, responsive
       )).toList(),
-    ]);
+    ], responsive);
   }
 
-  Widget _buildPeopleCategories(StateSetter? setModalState) {
+  Widget _buildPeopleCategories(StateSetter? setModalState, ResponsiveHelper responsive) {
     final peopleCategories = ['All', 'Developers', 'Designers', 'Managers', 'Recruiters', 'Students'];
 
     return _buildFilterSection('People Categories', [
@@ -1854,112 +1907,115 @@ class _ExploreScreenState extends State<ExploreScreen> {
             () {
           setState(() => _selectedCategory = category);
           setModalState?.call(() {});
-        },
+        }, responsive
       )).toList(),
-    ]);
+    ], responsive);
   }
 
-  List<Widget> _buildJobSpecificFilters(StateSetter? setModalState) {
+  List<Widget> _buildJobSpecificFilters(StateSetter? setModalState, ResponsiveHelper responsive) {
     return [
       _buildFilterSection('Job Type', [
         _buildFilterChip('Any', _selectedJobType == 'Any', () {
           setState(() => _selectedJobType = 'Any');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('Full-time', _selectedJobType == 'Full-time', () {
           setState(() => _selectedJobType = 'Full-time');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('Part-time', _selectedJobType == 'Part-time', () {
           setState(() => _selectedJobType = 'Part-time');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('Contract', _selectedJobType == 'Contract', () {
           setState(() => _selectedJobType = 'Contract');
           setModalState?.call(() {});
-        }),
-      ]),
-      const SizedBox(height: 20),
+        }, responsive),
+      ], responsive),
+      SizedBox(height: responsive.height(20)),
       _buildFilterSection('Location', [
         _buildFilterChip('Any', _selectedLocation == 'Any', () {
           setState(() => _selectedLocation = 'Any');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('Remote', _selectedLocation == 'Remote', () {
           setState(() => _selectedLocation = 'Remote');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('On-site', _selectedLocation == 'On-site', () {
           setState(() => _selectedLocation = 'On-site');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('Hybrid', _selectedLocation == 'Hybrid', () {
           setState(() => _selectedLocation = 'Hybrid');
           setModalState?.call(() {});
-        }),
-      ]),
-      const SizedBox(height: 20),
+        }, responsive),
+      ], responsive),
+      SizedBox(height: responsive.height(20)),
       _buildFilterOption('Remote Jobs Only', _remoteOnly, (value) {
         setState(() => _remoteOnly = value!);
         setModalState?.call(() {});
-      }),
+      }, responsive),
       _buildFilterOption('High Salary Jobs', _highSalaryOnly, (value) {
         setState(() => _highSalaryOnly = value!);
         setModalState?.call(() {});
-      }),
+      }, responsive),
     ];
   }
 
-  List<Widget> _buildPeopleSpecificFilters(StateSetter? setModalState) {
+  List<Widget> _buildPeopleSpecificFilters(StateSetter? setModalState, ResponsiveHelper responsive) {
     return [
       _buildFilterSection('User Type', [
         _buildFilterChip('Any', _selectedUserType == 'Any', () {
           setState(() => _selectedUserType = 'Any');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('Recruiter', _selectedUserType == 'Recruiter', () {
           setState(() => _selectedUserType = 'Recruiter');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('Job Seeker', _selectedUserType == 'Job Seeker', () {
           setState(() => _selectedUserType = 'Job Seeker');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('Student', _selectedUserType == 'Student', () {
           setState(() => _selectedUserType = 'Student');
           setModalState?.call(() {});
-        }),
-      ]),
-      const SizedBox(height: 20),
+        }, responsive),
+      ], responsive),
+      SizedBox(height: responsive.height(20)),
       _buildFilterSection('Skills', [
         _buildFilterChip('Any', _selectedSkills == 'Any', () {
           setState(() => _selectedSkills = 'Any');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('Flutter', _selectedSkills == 'Flutter', () {
           setState(() => _selectedSkills = 'Flutter');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('UI/UX', _selectedSkills == 'UI/UX', () {
           setState(() => _selectedSkills = 'UI/UX');
           setModalState?.call(() {});
-        }),
+        }, responsive),
         _buildFilterChip('Management', _selectedSkills == 'Management', () {
           setState(() => _selectedSkills = 'Management');
           setModalState?.call(() {});
-        }),
-      ]),
+        }, responsive),
+      ], responsive),
     ];
   }
 
-  Widget _buildFilterChip(String label, bool selected, VoidCallback onTap) {
+  Widget _buildFilterChip(String label, bool selected, VoidCallback onTap, ResponsiveHelper responsive) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: EdgeInsets.symmetric(
+            horizontal: responsive.padding(16), 
+            vertical: responsive.padding(10)
+        ),
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFFF2D55) : Colors.grey.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(responsive.radius(20)),
           border: Border.all(
             color: selected ? const Color(0xFFFF2D55) : Colors.grey.withOpacity(0.3),
           ),
@@ -1967,7 +2023,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: responsive.fontSize(14),
             color: selected ? Colors.white : Colors.grey.shade700,
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
           ),
@@ -1976,16 +2032,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildFilterOption(String title, bool value, ValueChanged<bool?> onChanged) {
+  Widget _buildFilterOption(String title, bool value, ValueChanged<bool?> onChanged, ResponsiveHelper responsive) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: responsive.padding(8)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 15,
+            style: TextStyle(
+              fontSize: responsive.fontSize(15),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -2013,26 +2069,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _selectedExperience = 'Any';
       _openToWorkOnly = false;
     });
-  }
-
-  String _getTimeAgo(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 365) {
-      return DateFormat('MMM d, yyyy').format(date);
-    } else if (difference.inDays > 30) {
-      final months = (difference.inDays / 30).floor();
-      return '$months month${months > 1 ? 's' : ''} ago';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
   }
 
   void _showUserProfile(String userId, Map<String, dynamic> user, bool isDarkMode) {

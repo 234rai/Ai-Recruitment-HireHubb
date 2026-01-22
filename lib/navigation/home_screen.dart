@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../services/firestore_service.dart';
 import '../services/realtime_database_service.dart';
@@ -16,6 +17,9 @@ import 'chatbot_screen.dart';
 import 'settings_screen.dart';
 import '../providers/role_provider.dart';
 import 'job_post_screen.dart'; // Add this import
+import 'analytics/job_performance_screen.dart';
+import 'analytics/hiring_metrics_screen.dart';
+import '../utils/responsive_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -197,6 +201,153 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  void _openJobPerformance() {
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const JobPerformanceScreen()),
+    );
+  }
+
+  void _openHiringMetrics() {
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const HiringMetricsScreen()),
+    );
+  }
+
+  void _showAnalyticsOptions(bool isDarkMode) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Analytics',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildAnalyticsOption(
+              icon: Icons.bar_chart_outlined,
+              title: 'Job Performance',
+              subtitle: 'View job stats and application metrics',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const JobPerformanceScreen()),
+                );
+              },
+              isDarkMode: isDarkMode,
+            ),
+            const SizedBox(height: 12),
+            _buildAnalyticsOption(
+              icon: Icons.trending_up_outlined,
+              title: 'Hiring Metrics',
+              subtitle: 'Track conversion rates and hiring progress',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HiringMetricsScreen()),
+                );
+              },
+              isDarkMode: isDarkMode,
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    required bool isDarkMode,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF2D55).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: const Color(0xFFFF2D55), size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 18,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _saveJob(String jobId) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -359,41 +510,44 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(context.responsive.padding(20)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '👋 Hi, ${_userProfile?['name']?.toString().split(' ')[0] ?? user?.displayName?.split(' ')[0] ?? 'User'}',
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDarkMode ? Colors.white : Colors.black,
+                            Flexible(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '👋 Hi, ${_userProfile?['name']?.toString().split(' ')[0] ?? user?.displayName?.split(' ')[0] ?? 'User'}',
+                                    style: TextStyle(
+                                      fontSize: context.responsive.fontSize(28),
+                                      fontWeight: FontWeight.bold,
+                                      color: isDarkMode ? Colors.white : Colors.black,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  roleProvider.isRecruiter
-                                      ? 'Find your ideal candidate today!'
-                                      : 'Find your dream job today!',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                  SizedBox(height: context.responsive.spacing(4)),
+                                  Text(
+                                    roleProvider.isRecruiter
+                                        ? 'Find your ideal candidate today!'
+                                        : 'Find your dream job today!',
+                                    style: TextStyle(
+                                      fontSize: context.responsive.fontSize(14),
+                                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                             GestureDetector(
                               onTap: () {
                                 _scaffoldKey.currentState?.openDrawer();
                               },
-                              child: _getProfileAvatar(24),
+                              child: _getProfileAvatar(context.responsive.iconSize(24)),
                             ),
                           ],
                         ),
@@ -580,28 +734,53 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ],
                   ),
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildRecruiterStat(
-                        icon: Icons.work_outline,
-                        value: '0',
-                        label: 'Jobs Posted',
-                        isDarkMode: isDarkMode,
-                      ),
-                      _buildRecruiterStat(
-                        icon: Icons.people_outline,
-                        value: '0',
-                        label: 'Applicants',
-                        isDarkMode: isDarkMode,
-                      ),
-                      _buildRecruiterStat(
-                        icon: Icons.trending_up,
-                        value: '0',
-                        label: 'Interviews',
-                        isDarkMode: isDarkMode,
-                      ),
-                    ],
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('jobs')
+                        .where('recruiterId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+                        .snapshots(),
+                    builder: (context, jobSnapshot) {
+                      final jobCount = jobSnapshot.data?.docs.length ?? 0;
+                      
+                      return StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('applications')
+                            .where('recruiterId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+                            .snapshots(),
+                        builder: (context, appSnapshot) {
+                          final applications = appSnapshot.data?.docs ?? [];
+                          final applicantCount = applications.length;
+                          final interviewCount = applications.where((doc) {
+                            final status = doc['status'] as String?;
+                            return status == 'shortlisted' || status == 'inProcess';
+                          }).length;
+                          
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildRecruiterStat(
+                                icon: Icons.work_outline,
+                                value: '$jobCount',
+                                label: 'Jobs Posted',
+                                isDarkMode: isDarkMode,
+                              ),
+                              _buildRecruiterStat(
+                                icon: Icons.people_outline,
+                                value: '$applicantCount',
+                                label: 'Applicants',
+                                isDarkMode: isDarkMode,
+                              ),
+                              _buildRecruiterStat(
+                                icon: Icons.trending_up,
+                                value: '$interviewCount',
+                                label: 'Interviews',
+                                isDarkMode: isDarkMode,
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
                   ),
                 ],
               ),
@@ -663,9 +842,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       _buildRecruiterAction(
                         icon: Icons.analytics_outlined,
                         label: 'Analytics',
-                        onTap: () {
-                          // TODO: Navigate to analytics
-                        },
+                        onTap: () => _showAnalyticsOptions(isDarkMode),
                         isDarkMode: isDarkMode,
                       ),
                     ],
@@ -1073,21 +1250,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ),
                       ] else if (roleProvider.isRecruiter) ...[
                         _buildDrawerItem(
-                          icon: Icons.dashboard_outlined,
-                          title: 'Dashboard',
-                          onTap: () {},
-                          isDarkMode: isDarkMode,
-                        ),
-                        _buildDrawerItem(
                           icon: Icons.add_box_outlined,
                           title: 'Post a Job',
                           onTap: _openJobPostScreen,
-                          isDarkMode: isDarkMode,
-                        ),
-                        _buildDrawerItem(
-                          icon: Icons.people_outline,
-                          title: 'Candidates Pool',
-                          onTap: () {},
                           isDarkMode: isDarkMode,
                         ),
                         _buildDrawerItem(
@@ -1137,7 +1302,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     color: isDarkMode ? Colors.white : Colors.black,
                                   ),
                                 ),
-                                onTap: () {},
+                                onTap: _openJobPerformance,
                                 contentPadding: EdgeInsets.zero,
                                 dense: true,
                                 visualDensity: VisualDensity.compact,
@@ -1156,7 +1321,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     color: isDarkMode ? Colors.white : Colors.black,
                                   ),
                                 ),
-                                onTap: () {},
+                                onTap: _openHiringMetrics,
                                 contentPadding: EdgeInsets.zero,
                                 dense: true,
                                 visualDensity: VisualDensity.compact,

@@ -5,6 +5,7 @@ import '../../services/user_service.dart'; // ADD THIS
 import '../../models/user_role.dart'; // ADD THIS
 import 'package:provider/provider.dart';
 import '../../providers/role_provider.dart';
+import '../../utils/responsive_helper.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -188,7 +189,7 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
 
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(context.responsive.padding(24)),
           child: AnimatedBuilder(
             animation: _animationController,
             builder: (context, child) {
@@ -227,8 +228,8 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
     return Column(
       children: [
         Container(
-          width: 80,
-          height: 80,
+          width: context.responsive.width(80),
+          height: context.responsive.height(80),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFFFF2D55), Color(0xFFFF6B9D)],
@@ -244,17 +245,17 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
               ),
             ],
           ),
-          child: const Icon(
+          child: Icon(
             Icons.work_outline,
             color: Colors.white,
-            size: 40,
+            size: context.responsive.iconSize(40),
           ),
         ),
         const SizedBox(height: 16),
         Text(
           'Join HireHubb',
           style: TextStyle(
-            fontSize: 28,
+            fontSize: context.responsive.fontSize(28),
             fontWeight: FontWeight.bold,
             color: isDarkMode ? Colors.white : Colors.black,
           ),

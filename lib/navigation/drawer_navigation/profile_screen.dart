@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '/services/realtime_database_service.dart';
+import '../../utils/responsive_helper.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -739,7 +740,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Widget _getProfileImage(double radius) {
+  Widget _getProfileImage(double radius, ResponsiveHelper responsive) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final base64Image = _userProfile?['photoBase64']?.toString();
 
@@ -837,6 +838,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
+    final responsive = ResponsiveHelper(context);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
@@ -848,11 +850,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: TextStyle(
             color: theme.textTheme.bodyLarge?.color,
             fontWeight: FontWeight.bold,
-            fontSize: 18,
+            fontSize: responsive.fontSize(18),
           ),
         ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: theme.iconTheme.color),
+          icon: Icon(Icons.arrow_back, color: theme.iconTheme.color, size: responsive.iconSize(24)),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -887,15 +889,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             children: [
               Container(
-                margin: const EdgeInsets.all(16),
+                margin: EdgeInsets.all(responsive.padding(16)),
                 decoration: BoxDecoration(
                   color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(responsive.radius(16)),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
+                      blurRadius: responsive.radius(10),
+                      offset: Offset(0, responsive.height(2)),
                     ),
                   ],
                 ),
@@ -905,34 +907,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       clipBehavior: Clip.none,
                       children: [
                         ClipRRect(
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(16),
-                            topRight: Radius.circular(16),
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(responsive.radius(16)),
+                            topRight: Radius.circular(responsive.radius(16)),
                           ),
-                          child: _getBanner(140),
+                          child: _getBanner(responsive.height(140)),
                         ),
                         if (_isEditing)
                           Positioned(
-                            right: 12,
-                            top: 12,
+                            right: responsive.width(12),
+                            top: responsive.height(12),
                             child: GestureDetector(
                               onTap: _uploadBannerImage,
                               child: Container(
-                                padding: const EdgeInsets.all(8),
+                                padding: EdgeInsets.all(responsive.padding(8)),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.9),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.camera_alt,
-                                  size: 18,
-                                  color: Color(0xFFFF4D8D),
+                                  size: responsive.iconSize(18),
+                                  color: const Color(0xFFFF4D8D),
                                 ),
                               ),
                             ),
                           ),
                         Positioned(
-                          bottom: -50,
+                          bottom: -responsive.height(50),
                           left: 0,
                           right: 0,
                           child: Center(
@@ -941,33 +943,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 GestureDetector(
                                   onTap: _isEditing ? _uploadProfilePicture : null,
                                   child: Container(
-                                    padding: const EdgeInsets.all(4),
+                                    padding: EdgeInsets.all(responsive.padding(4)),
                                     decoration: BoxDecoration(
                                       color: theme.cardColor,
                                       shape: BoxShape.circle,
                                       boxShadow: [
                                         BoxShadow(
                                           color: Colors.black.withOpacity(isDark ? 0.5 : 0.1),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
+                                          blurRadius: responsive.radius(10),
+                                          offset: Offset(0, responsive.height(4)),
                                         ),
                                       ],
                                     ),
-                                    child: _getProfileImage(50),
+                                    child: _getProfileImage(responsive.width(50), responsive),
                                   ),
                                 ),
                                 Positioned(
-                                  bottom: 4,
-                                  right: 4,
+                                  bottom: responsive.height(4),
+                                  right: responsive.width(4),
                                   child: Container(
-                                    width: 18,
-                                    height: 18,
+                                    width: responsive.width(18),
+                                    height: responsive.width(18),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF4CD964),
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                         color: theme.cardColor,
-                                        width: 3,
+                                        width: responsive.width(3),
                                       ),
                                     ),
                                   ),
@@ -978,31 +980,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 58),
+                    SizedBox(height: responsive.height(58)),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: EdgeInsets.symmetric(horizontal: responsive.padding(20)),
                       child: Column(
                         children: [
                           Text(
                             _userProfile?['name'] ?? 'Your Name',
                             style: TextStyle(
-                              fontSize: 22,
+                              fontSize: responsive.fontSize(22),
                               fontWeight: FontWeight.bold,
                               color: theme.textTheme.bodyLarge?.color,
                             ),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 6),
+                          SizedBox(height: responsive.height(6)),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.remove_red_eye_outlined,
-                                  size: 14, color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
-                              const SizedBox(width: 4),
+                                  size: responsive.iconSize(14), color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+                              SizedBox(width: responsive.width(4)),
                               Text(
                                 'Profile visibility standard',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: responsive.fontSize(12),
                                   color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                                 ),
                               ),
@@ -1011,12 +1013,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: responsive.height(16)),
                     Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      margin: EdgeInsets.symmetric(horizontal: responsive.padding(16)),
                       decoration: BoxDecoration(
                         color: isDark ? Colors.grey[900] : const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(responsive.radius(8)),
                       ),
                       child: Row(
                         children: [
@@ -1024,16 +1026,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: GestureDetector(
                               onTap: () => setState(() => _selectedTab = 0),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: EdgeInsets.symmetric(vertical: responsive.padding(12)),
                                 decoration: BoxDecoration(
                                   color: _selectedTab == 0 ? theme.cardColor : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(responsive.radius(8)),
                                 ),
                                 child: Text(
                                   'Personal Summary',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 13,
+                                    fontSize: responsive.fontSize(13),
                                     fontWeight: _selectedTab == 0 ? FontWeight.w600 : FontWeight.normal,
                                     color: _selectedTab == 0
                                         ? theme.textTheme.bodyLarge?.color
@@ -1047,16 +1049,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: GestureDetector(
                               onTap: () => setState(() => _selectedTab = 1),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: EdgeInsets.symmetric(vertical: responsive.padding(12)),
                                 decoration: BoxDecoration(
                                   color: _selectedTab == 1 ? theme.cardColor : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(responsive.radius(8)),
                                 ),
                                 child: Text(
                                   'Career History',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 13,
+                                    fontSize: responsive.fontSize(13),
                                     fontWeight: _selectedTab == 1 ? FontWeight.w600 : FontWeight.normal,
                                     color: _selectedTab == 1
                                         ? theme.textTheme.bodyLarge?.color
@@ -1069,18 +1071,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: responsive.height(20)),
                   ],
                 ),
               ),
               if (_selectedTab == 0) ...[
-                _buildModernResumeSection(),
-                _buildModernAboutSection(),
-                _buildModernContactSection(),
+                _buildModernResumeSection(responsive),
+                _buildModernAboutSection(responsive),
+                _buildModernContactSection(responsive),
                 // Custom Sections
-                ..._buildCustomSections(),
+                ..._buildCustomSections(responsive),
               ] else ...[
-                _buildModernCareerSection(),
+                _buildModernCareerSection(responsive),
               ],
               const SizedBox(height: 20),
             ],
@@ -1090,7 +1092,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  List<Widget> _buildCustomSections() {
+  List<Widget> _buildCustomSections(ResponsiveHelper responsive) {
     if (_customSections.isEmpty && !_isEditing) {
       return [];
     }
@@ -1103,16 +1105,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final section = entry.value;
 
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.all(16),
+        margin: EdgeInsets.symmetric(horizontal: responsive.padding(16), vertical: responsive.padding(8)),
+        padding: EdgeInsets.all(responsive.padding(16)),
         decoration: BoxDecoration(
           color: theme.cardColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(responsive.radius(12)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(isDark ? 0.3 : 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              blurRadius: responsive.radius(8),
+              offset: Offset(0, responsive.height(2)),
             ),
           ],
         ),
@@ -1125,7 +1127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   section['title']!,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: responsive.fontSize(16),
                     fontWeight: FontWeight.bold,
                     color: theme.textTheme.bodyLarge?.color,
                   ),
@@ -1135,13 +1137,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.edit, size: 18,
+                        icon: Icon(Icons.edit, size: responsive.iconSize(18),
                             color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
                         onPressed: () => _editCustomSection(index),
                         tooltip: 'Edit Section',
                       ),
                       IconButton(
-                        icon: Icon(Icons.delete_outline, size: 18,
+                        icon: Icon(Icons.delete_outline, size: responsive.iconSize(18),
                             color: Colors.red[400]),
                         onPressed: () => _deleteCustomSection(index),
                         tooltip: 'Delete Section',
@@ -1150,11 +1152,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: responsive.height(12)),
             Text(
               section['content']!,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: responsive.fontSize(14),
                 height: 1.5,
                 color: theme.textTheme.bodyLarge?.color,
               ),
@@ -1165,21 +1167,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }).toList();
   }
 
-  Widget _buildModernResumeSection() {
+  Widget _buildModernResumeSection(ResponsiveHelper responsive) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(horizontal: responsive.padding(16), vertical: responsive.padding(8)),
+      padding: EdgeInsets.all(responsive.padding(16)),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(responsive.radius(12)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.3 : 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: responsive.radius(8),
+            offset: Offset(0, responsive.height(2)),
           ),
         ],
       ),
@@ -1189,32 +1191,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             'Resume',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: responsive.fontSize(16),
               fontWeight: FontWeight.bold,
               color: theme.textTheme.bodyLarge?.color,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: responsive.height(12)),
           if (hasResumeInProfile())
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(responsive.padding(12)),
               decoration: BoxDecoration(
                 color: isDark ? Colors.grey[900] : const Color(0xFFF8F8F8),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(responsive.radius(8)),
                 border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[200]!),
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: responsive.width(40),
+                    height: responsive.width(40),
                     decoration: BoxDecoration(
                       color: Colors.red[50],
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(responsive.radius(8)),
                     ),
-                    child: const Icon(Icons.picture_as_pdf, color: Colors.red, size: 24),
+                    child: Icon(Icons.picture_as_pdf, color: Colors.red, size: responsive.iconSize(24)),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: responsive.width(12)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1223,18 +1225,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _userProfile?['resumeFileName'] ?? 'resume.pdf',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                            fontSize: responsive.fontSize(13),
                             color: theme.textTheme.bodyLarge?.color,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: responsive.height(2)),
                         Text(
                           // FIXED: Real-time date and file size without intl package
                           '${_formatUploadDate(_userProfile?['resumeUploadDate'])} • ${_formatFileSize(_userProfile?['resumeFileSize'] ?? 0)}',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: responsive.fontSize(11),
                             color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                           ),
                         ),
@@ -1246,12 +1248,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.upload_outlined, size: 20, color: Color(0xFFFF4D8D)),
+                          icon: Icon(Icons.upload_outlined, size: responsive.iconSize(20), color: const Color(0xFFFF4D8D)),
                           onPressed: _uploadResume,
                           tooltip: 'Replace Resume',
                         ),
                         IconButton(
-                          icon: Icon(Icons.delete_outline, size: 20,
+                          icon: Icon(Icons.delete_outline, size: responsive.iconSize(20),
                               color: Colors.red[400]),
                           onPressed: _deleteResume,
                           tooltip: 'Delete Resume',
@@ -1260,7 +1262,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     )
                   else
                     IconButton(
-                      icon: Icon(Icons.download_outlined, size: 20,
+                      icon: Icon(Icons.download_outlined, size: responsive.iconSize(20),
                           color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7)),
                       onPressed: _downloadResume,
                     ),
@@ -1271,22 +1273,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             GestureDetector(
               onTap: _uploadResume,
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(responsive.padding(16)),
                 decoration: BoxDecoration(
                   color: isDark ? Colors.grey[900] : const Color(0xFFF8F8F8),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(responsive.radius(8)),
                   border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!, style: BorderStyle.solid),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.upload_file, color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
-                    const SizedBox(width: 8),
+                    Icon(Icons.upload_file, color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6), size: responsive.iconSize(24)),
+                    SizedBox(width: responsive.width(8)),
                     Text(
                       'Upload Resume',
                       style: TextStyle(
                         color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                         fontWeight: FontWeight.w500,
+                        fontSize: responsive.fontSize(14),
                       ),
                     ),
                   ],
@@ -1298,21 +1301,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildModernAboutSection() {
+  Widget _buildModernAboutSection(ResponsiveHelper responsive) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(horizontal: responsive.padding(16), vertical: responsive.padding(8)),
+      padding: EdgeInsets.all(responsive.padding(16)),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(responsive.radius(12)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.3 : 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: responsive.radius(8),
+            offset: Offset(0, responsive.height(2)),
           ),
         ],
       ),
@@ -1322,33 +1325,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             'About',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: responsive.fontSize(16),
               fontWeight: FontWeight.bold,
               color: theme.textTheme.bodyLarge?.color,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: responsive.height(12)),
           if (_isEditing)
             TextField(
               controller: _aboutController,
               maxLines: 4,
-              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+              style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: responsive.fontSize(14)),
               decoration: InputDecoration(
                 hintText: 'Tell us about yourself...',
-                hintStyle: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.4)),
+                hintStyle: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.4), fontSize: responsive.fontSize(14)),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(responsive.radius(8)),
                   borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(responsive.radius(8)),
                   borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(responsive.radius(8)),
                   borderSide: const BorderSide(color: Color(0xFFFF4D8D)),
                 ),
-                contentPadding: const EdgeInsets.all(12),
+                contentPadding: EdgeInsets.all(responsive.padding(12)),
               ),
             )
           else
@@ -1357,7 +1360,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? 'No information added yet'
                   : _aboutController.text,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: responsive.fontSize(14),
                 height: 1.5,
                 color: _aboutController.text.isEmpty
                     ? theme.textTheme.bodyMedium?.color?.withOpacity(0.5)
@@ -1369,21 +1372,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildModernContactSection() {
+  Widget _buildModernContactSection(ResponsiveHelper responsive) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(horizontal: responsive.padding(16), vertical: responsive.padding(8)),
+      padding: EdgeInsets.all(responsive.padding(16)),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(responsive.radius(12)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.3 : 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: responsive.radius(8),
+            offset: Offset(0, responsive.height(2)),
           ),
         ],
       ),
@@ -1393,31 +1396,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             'Contact & Social',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: responsive.fontSize(16),
               fontWeight: FontWeight.bold,
               color: theme.textTheme.bodyLarge?.color,
             ),
           ),
-          const SizedBox(height: 16),
-          _buildCompactInfoRow(Icons.email_outlined, 'Email', _emailController, isReadOnly: true),
-          const SizedBox(height: 12),
-          _buildCompactInfoRow(Icons.phone_outlined, 'Phone', _phoneController, isPhone: true),
-          const SizedBox(height: 12),
-          _buildCompactInfoRow(Icons.location_on_outlined, 'Location', _locationController),
-          const SizedBox(height: 16),
+          SizedBox(height: responsive.height(16)),
+          _buildCompactInfoRow(Icons.email_outlined, 'Email', _emailController, responsive, isReadOnly: true),
+          SizedBox(height: responsive.height(12)),
+          _buildCompactInfoRow(Icons.phone_outlined, 'Phone', _phoneController, responsive, isPhone: true),
+          SizedBox(height: responsive.height(12)),
+          _buildCompactInfoRow(Icons.location_on_outlined, 'Location', _locationController, responsive),
+          SizedBox(height: responsive.height(16)),
           Divider(height: 1, color: isDark ? Colors.grey[800] : Colors.grey[200]),
-          const SizedBox(height: 16),
-          _buildCompactInfoRow(Icons.code, 'GitHub', _githubController),
-          const SizedBox(height: 12),
-          _buildCompactInfoRow(Icons.business_outlined, 'LinkedIn', _linkedinController),
-          const SizedBox(height: 12),
-          _buildCompactInfoRow(Icons.language, 'Portfolio', _portfolioController),
+          SizedBox(height: responsive.height(16)),
+          _buildCompactInfoRow(Icons.code, 'GitHub', _githubController, responsive),
+          SizedBox(height: responsive.height(12)),
+          _buildCompactInfoRow(Icons.business_outlined, 'LinkedIn', _linkedinController, responsive),
+          SizedBox(height: responsive.height(12)),
+          _buildCompactInfoRow(Icons.language, 'Portfolio', _portfolioController, responsive),
         ],
       ),
     );
   }
 
-  Widget _buildModernCareerSection() {
+  Widget _buildModernCareerSection(ResponsiveHelper responsive) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
     final careers = _userProfile?['career'] is List
@@ -1425,16 +1428,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : <Map<String, dynamic>>[];
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(horizontal: responsive.padding(16), vertical: responsive.padding(8)),
+      padding: EdgeInsets.all(responsive.padding(16)),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(responsive.radius(12)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.3 : 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: responsive.radius(8),
+            offset: Offset(0, responsive.height(2)),
           ),
         ],
       ),
@@ -1447,7 +1450,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Text(
                 'Career History',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: responsive.fontSize(16),
                   fontWeight: FontWeight.bold,
                   color: theme.textTheme.bodyLarge?.color,
                 ),
@@ -1461,16 +1464,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: responsive.height(12)),
           if (careers.isEmpty)
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(responsive.padding(20)),
               child: Center(
                 child: Text(
                   'No career history added yet',
                   style: TextStyle(
                       color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
-                      fontSize: 14),
+                      fontSize: responsive.fontSize(14)),
                 ),
               ),
             )
@@ -1480,11 +1483,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: careers.length,
               separatorBuilder: (context, index) => Divider(
-                  height: 24,
+                  height: responsive.height(24),
                   color: isDark ? Colors.grey[800] : Colors.grey[200]),
               itemBuilder: (context, index) {
                 final career = careers[index];
-                return _buildCareerItem(career);
+                return _buildCareerItem(career, responsive);
               },
             ),
         ],
@@ -1492,7 +1495,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildCareerItem(Map<String, dynamic> career) {
+  Widget _buildCareerItem(Map<String, dynamic> career, ResponsiveHelper responsive) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
     final title = career['title'] ?? 'Position Title';
@@ -1504,24 +1507,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 40,
-          height: 40,
+          width: responsive.width(40),
+          height: responsive.width(40),
           decoration: BoxDecoration(
             color: isDark ? Colors.grey[800] : Colors.grey[200],
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(responsive.radius(8)),
           ),
           child: Center(
             child: Text(
               company.isNotEmpty ? company[0].toUpperCase() : 'C',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: responsive.fontSize(18),
                 fontWeight: FontWeight.bold,
                 color: isDark ? Colors.grey[400] : Colors.black54,
               ),
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: responsive.width(12)),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1529,24 +1532,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: responsive.fontSize(15),
                   fontWeight: FontWeight.w600,
                   color: theme.textTheme.bodyLarge?.color,
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: responsive.height(4)),
               Text(
                 company,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: responsive.fontSize(13),
                   color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                 ),
               ),
-              const SizedBox(height: 2),
+              SizedBox(height: responsive.height(2)),
               Text(
                 '$duration${years.isNotEmpty ? " • $years" : ""}',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: responsive.fontSize(12),
                   color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
                 ),
               ),
@@ -1555,7 +1558,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         if (_isEditing)
           IconButton(
-            icon: Icon(Icons.more_horiz, size: 20,
+            icon: Icon(Icons.more_horiz, size: responsive.iconSize(20),
                 color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
             onPressed: () {
               // Edit/Delete career options
@@ -1565,7 +1568,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildCompactInfoRow(IconData icon, String label, TextEditingController controller, {bool isPhone = false, bool isReadOnly = false}) {
+  Widget _buildCompactInfoRow(IconData icon, String label, TextEditingController controller, ResponsiveHelper responsive, {bool isPhone = false, bool isReadOnly = false}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
 
@@ -1576,41 +1579,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: responsive.fontSize(12),
               fontWeight: FontWeight.w500,
               color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: responsive.height(6)),
           TextField(
             controller: controller,
-            style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+            style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: responsive.fontSize(14)),
             keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
             onChanged: isPhone ? _validateAndUpdatePhone : null,
             readOnly: isReadOnly,
             decoration: InputDecoration(
-              prefixIcon: Icon(icon, size: 18,
+              prefixIcon: Icon(icon, size: responsive.iconSize(18),
                   color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
               hintText: 'Enter $label',
-              hintStyle: TextStyle(fontSize: 13,
+              hintStyle: TextStyle(fontSize: responsive.fontSize(13),
                   color: theme.textTheme.bodyMedium?.color?.withOpacity(0.4)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding: EdgeInsets.symmetric(horizontal: responsive.padding(12), vertical: responsive.padding(10)),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(responsive.radius(8)),
                 borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(responsive.radius(8)),
                 borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(responsive.radius(8)),
                 borderSide: BorderSide(
                   color: _phoneError != null ? Colors.red : const Color(0xFFFF4D8D),
                 ),
               ),
               errorText: isPhone ? _phoneError : null,
-              errorStyle: const TextStyle(fontSize: 12),
+              errorStyle: TextStyle(fontSize: responsive.fontSize(12)),
             ),
           ),
         ],
@@ -1619,8 +1622,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Row(
       children: [
-        Icon(icon, size: 18, color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
-        const SizedBox(width: 12),
+        Icon(icon, size: responsive.iconSize(18), color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
+        SizedBox(width: responsive.width(12)),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1628,15 +1631,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: responsive.fontSize(11),
                   color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
                 ),
               ),
-              const SizedBox(height: 2),
+              SizedBox(height: responsive.height(2)),
               Text(
                 controller.text.isEmpty ? 'Not specified' : controller.text,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: responsive.fontSize(13),
                   color: controller.text.isEmpty
                       ? theme.textTheme.bodyMedium?.color?.withOpacity(0.4)
                       : theme.textTheme.bodyLarge?.color,
@@ -1657,47 +1660,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildCreateProfile() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
+    final responsive = ResponsiveHelper(context);
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: EdgeInsets.all(responsive.padding(32)),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 120,
-              height: 120,
+              width: responsive.width(120),
+              height: responsive.width(120),
               decoration: BoxDecoration(
                 color: const Color(0xFFFF4D8D).withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.person_add_outlined,
-                size: 60,
-                color: Color(0xFFFF4D8D),
+                size: responsive.iconSize(60),
+                color: const Color(0xFFFF4D8D),
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: responsive.height(24)),
             Text(
               'Create Your Profile',
               style: TextStyle(
-                fontSize: 24,
+                fontSize: responsive.fontSize(24),
                 fontWeight: FontWeight.bold,
                 color: theme.textTheme.bodyLarge?.color,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: responsive.height(12)),
             Text(
               'Start building your professional profile to unlock all features and connect with opportunities',
               style: TextStyle(
-                fontSize: 15,
+                fontSize: responsive.fontSize(15),
                 color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: responsive.height(32)),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -1705,27 +1709,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF4D8D),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: EdgeInsets.symmetric(vertical: responsive.padding(16)),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(responsive.radius(12)),
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
+                child: Text(
                   'Create Profile',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: responsive.fontSize(16),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: responsive.height(16)),
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(responsive.padding(20)),
               decoration: BoxDecoration(
                 color: isDark ? Colors.grey[900] : Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(responsive.radius(12)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1734,20 +1738,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     'What you can do:',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: responsive.fontSize(14),
                       color: theme.textTheme.bodyLarge?.color,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildBenefitItem(Icons.work_outline, 'Apply to jobs instantly'),
-                  const SizedBox(height: 8),
-                  _buildBenefitItem(Icons.description_outlined, 'Upload your resume'),
-                  const SizedBox(height: 8),
-                  _buildBenefitItem(Icons.star_outline, 'Showcase your skills'),
-                  const SizedBox(height: 8),
-                  _buildBenefitItem(Icons.link, 'Share your social profiles'),
-                  const SizedBox(height: 8),
-                  _buildBenefitItem(Icons.add_circle_outline, 'Add custom sections'),
+                  SizedBox(height: responsive.height(12)),
+                  _buildBenefitItem(Icons.work_outline, 'Apply to jobs instantly', responsive),
+                  SizedBox(height: responsive.height(8)),
+                  _buildBenefitItem(Icons.description_outlined, 'Upload your resume', responsive),
+                  SizedBox(height: responsive.height(8)),
+                  _buildBenefitItem(Icons.star_outline, 'Showcase your skills', responsive),
+                  SizedBox(height: responsive.height(8)),
+                  _buildBenefitItem(Icons.link, 'Share your social profiles', responsive),
+                  SizedBox(height: responsive.height(8)),
+                  _buildBenefitItem(Icons.add_circle_outline, 'Add custom sections', responsive),
                 ],
               ),
             ),
@@ -1757,29 +1761,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildBenefitItem(IconData icon, String text) {
+  Widget _buildBenefitItem(IconData icon, String text, ResponsiveHelper responsive) {
     final theme = Theme.of(context);
 
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          padding: EdgeInsets.all(responsive.padding(6)),
           decoration: BoxDecoration(
             color: const Color(0xFFFF4D8D).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(responsive.radius(6)),
           ),
           child: Icon(
             icon,
-            size: 16,
+            size: responsive.iconSize(16),
             color: const Color(0xFFFF4D8D),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: responsive.width(12)),
         Expanded(
           child: Text(
             text,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: responsive.fontSize(14),
               color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
             ),
           ),

@@ -357,17 +357,57 @@ class NotificationService {
     }
   }
 
+  // Public method for explicit token saving (e.g., after login)
+  Future<void> saveTokenAfterLogin(String token) async {
+    print('🔐 saveTokenAfterLogin called explicitly');
+    await _saveTokenToFirestore(token);
+  }
+
   // Listen to auth changes and save token when user logs in
   void setupAuthListener() {
+    print('👂 Setting up auth state listener...');
     _auth.authStateChanges().listen((User? user) {
       if (user != null) {
-        print('🔐 User logged in, saving FCM token...');
+        print('🔐 Auth listener: User logged in (${user.uid}), saving FCM token...');
         _firebaseMessaging.getToken().then((token) {
           if (token != null) {
+            print('✅ Auth listener: Got token, saving to Firestore');
             _saveTokenToFirestore(token);
+          } else {
+            print('⚠️ Auth listener: Token is null, cannot save');
           }
+        }).catchError((error) {
+          print('❌ Auth listener: Error getting token: $error');
         });
+      } else {
+        print('🔓 Auth listener: User logged out');
       }
     });
+    print('✅ Auth state listener set up successfully');
+  }
+
+  /// FIX #7 by Antigravity: Clear FCM token on logout
+  /// Prevents notifications from being sent to logged-out user's device
+  /// Call this before signing out the user
+  Future<void> clearTokenOnLogout() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        print('⚠️ No user logged in, nothing to clear');
+        return;
+      }
+
+      print('🔓 Clearing FCM token for user $userId on logout...');
+
+      await _firestore.collection('users').doc(userId).update({
+        'fcmToken': FieldValue.delete(),
+        'fcmTokenClearedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('✅ FCM token cleared successfully');
+    } catch (e) {
+      print('⚠️ Error clearing FCM token on logout: $e');
+      // Don't rethrow - logout should still proceed even if token cleanup fails
+    }
   }
 }

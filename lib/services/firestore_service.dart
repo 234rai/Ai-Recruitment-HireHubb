@@ -440,7 +440,6 @@ class FirestoreService {
   // UPDATED: Add sample jobs with recruiterId
   // ============================================================================
   static Future<void> addSampleJobs() async {
-    // Get current user as recruiter (or use a default recruiter ID)
     final currentUser = _auth.currentUser;
     final recruiterId = currentUser?.uid ?? 'sample_recruiter_id';
 
@@ -454,7 +453,6 @@ class FirestoreService {
         'location': 'Remote',
         'country': 'USA',
         'salary': '\$120k - \$180k',
-        'postedTime': '2 hours ago',
         'isRemote': true,
         'isFeatured': true,
         'skills': ['Product Strategy', 'Agile', 'Leadership'],
@@ -468,7 +466,10 @@ class FirestoreService {
         'companyDescription': 'Google is a global technology company focused on search engine technology, cloud computing, and advertising.',
         'postedAt': Timestamp.now(),
         'searchKeywords': ['google', 'product manager', 'remote', 'senior', 'agile', 'leadership'],
-        'recruiterId': recruiterId, // ADD recruiterId
+        'recruiterId': recruiterId,
+        'status': 'active',
+        'applications': 0,
+        'jobType': 'Full-time',
       },
       {
         'company': 'Microsoft',
@@ -479,7 +480,6 @@ class FirestoreService {
         'location': 'Hybrid',
         'country': 'UK',
         'salary': '\$100k - \$150k',
-        'postedTime': '5 hours ago',
         'isRemote': false,
         'isFeatured': false,
         'skills': ['C#', '.NET', 'Azure'],
@@ -493,7 +493,10 @@ class FirestoreService {
         'companyDescription': 'Microsoft is a leading technology company that develops, licenses, and supports software, services, and devices.',
         'postedAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(hours: 5))),
         'searchKeywords': ['microsoft', 'software engineer', 'c#', '.net', 'azure', 'hybrid'],
-        'recruiterId': recruiterId, // ADD recruiterId
+        'recruiterId': recruiterId,
+        'status': 'active',
+        'applications': 0,
+        'jobType': 'Full-time',
       },
       {
         'company': 'Apple',
@@ -504,7 +507,7 @@ class FirestoreService {
         'location': 'Remote',
         'country': 'Remote',
         'salary': '\$90k - \$130k',
-        'postedTime': '1 day ago',
+        // ❌ REMOVE THIS LINE: 'postedTime': '1 day ago',
         'isRemote': true,
         'isFeatured': false,
         'skills': ['Figma', 'UI/UX', 'Prototyping'],
@@ -518,7 +521,10 @@ class FirestoreService {
         'companyDescription': 'Apple is a multinational technology company that designs, develops, and sells consumer electronics and software.',
         'postedAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 1))),
         'searchKeywords': ['apple', 'ux designer', 'ui/ux', 'figma', 'remote', 'design'],
-        'recruiterId': recruiterId, // ADD recruiterId
+        'recruiterId': recruiterId,
+        'status': 'active',
+        'applications': 0,
+        'jobType': 'Full-time',
       },
       {
         'company': 'Amazon',
@@ -529,7 +535,7 @@ class FirestoreService {
         'location': 'Remote',
         'country': 'Canada',
         'salary': '\$85k - \$125k',
-        'postedTime': '3 days ago',
+        // ❌ REMOVE THIS LINE: 'postedTime': '3 days ago',
         'isRemote': true,
         'isFeatured': true,
         'skills': ['React', 'TypeScript', 'CSS'],
@@ -543,7 +549,10 @@ class FirestoreService {
         'companyDescription': 'Amazon is a multinational technology company focusing on e-commerce, cloud computing, and artificial intelligence.',
         'postedAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 3))),
         'searchKeywords': ['amazon', 'frontend', 'react', 'typescript', 'remote', 'developer'],
-        'recruiterId': recruiterId, // ADD recruiterId
+        'recruiterId': recruiterId,
+        'status': 'active',
+        'applications': 0,
+        'jobType': 'Full-time',
       },
       {
         'company': 'Meta',
@@ -554,7 +563,7 @@ class FirestoreService {
         'location': 'Hybrid',
         'country': 'USA',
         'salary': '\$110k - \$160k',
-        'postedTime': '1 week ago',
+        // ❌ REMOVE THIS LINE: 'postedTime': '1 week ago',
         'isRemote': false,
         'isFeatured': false,
         'skills': ['Python', 'Machine Learning', 'SQL'],
@@ -568,7 +577,10 @@ class FirestoreService {
         'companyDescription': 'Meta builds technologies that help people connect, find communities, and grow businesses.',
         'postedAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 7))),
         'searchKeywords': ['meta', 'data scientist', 'python', 'machine learning', 'sql', 'hybrid'],
-        'recruiterId': recruiterId, // ADD recruiterId
+        'recruiterId': recruiterId,
+        'status': 'active',
+        'applications': 0,
+        'jobType': 'Full-time',
       },
     ];
 
@@ -577,6 +589,31 @@ class FirestoreService {
     }
 
     print('✅ Sample jobs added successfully with recruiterId!');
+  }
+
+  // Get application count as STREAM for real-time updates
+  static Stream<int> getJobApplicationsCountStream(String jobId) {
+    try {
+      if (jobId.isEmpty) {
+        print('❌ Error: Empty jobId provided');
+        return Stream.value(0);
+      }
+
+      print('🔍 Setting up stream for jobId: $jobId');
+
+      return _firestore
+          .collection('applications')
+          .where('jobId', isEqualTo: jobId)
+          .snapshots()
+          .map((snapshot) {
+        final count = snapshot.docs.length;
+        print('📊 Real-time count updated for job $jobId: $count applications');
+        return count;
+      });
+    } catch (e) {
+      print('❌ Error getting application count stream: $e');
+      return Stream.value(0);
+    }
   }
 
   // Update user profile
@@ -638,14 +675,21 @@ class FirestoreService {
   // Get application count for a specific job
   static Future<int> getJobApplicationsCount(String jobId) async {
     try {
+      if (jobId.isEmpty) {
+        print('Error: Empty jobId provided to getJobApplicationsCount');
+        return 0;
+      }
+
       final snapshot = await _firestore
           .collection('applications')
           .where('jobId', isEqualTo: jobId)
           .get();
 
-      return snapshot.docs.length;
+      final count = snapshot.docs.length;
+      print('📊 Job $jobId has $count applicants');
+      return count;
     } catch (e) {
-      print('Error getting application count: $e');
+      print('Error getting application count for job $jobId: $e');
       return 0;
     }
   }

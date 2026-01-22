@@ -15,8 +15,23 @@ class AIResumeCheckerScreen extends StatefulWidget {
 class _AIResumeCheckerScreenState extends State<AIResumeCheckerScreen> {
   bool _isAnalyzing = false;
   String _selectedFileName = '';
+  String? _selectedDomain;
   String? _selectedFilePath;
   Map<String, dynamic>? _analysisResult;
+
+  // Domain list (must match your JSON files)
+  final List<String> domains = [
+    "software",
+    "hardware",
+    "mechanical",
+    "electrical",
+    "civil",
+    "chemical",
+    "medical",
+    "teaching",
+    "business",
+    "bioinformatics"
+  ];
 
   // API endpoint from your friend's code
   final String apiUrl =
@@ -52,6 +67,17 @@ class _AIResumeCheckerScreenState extends State<AIResumeCheckerScreen> {
   void _startAnalysis() async {
     if (_selectedFilePath == null) return;
 
+    // Validate domain selection
+    if (_selectedDomain == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a domain before analyzing'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isAnalyzing = true;
     });
@@ -77,6 +103,12 @@ class _AIResumeCheckerScreenState extends State<AIResumeCheckerScreen> {
 
       // Create multipart request
       var request = http.MultipartRequest("POST", Uri.parse(apiUrl));
+
+      // Add domain field - IMPORTANT: Domain is now required
+      if (_selectedDomain != null) {
+        request.fields['domain'] = _selectedDomain!;
+      }
+
       request.files.add(await http.MultipartFile.fromPath("file", file.path));
 
       // Send request
@@ -124,21 +156,54 @@ class _AIResumeCheckerScreenState extends State<AIResumeCheckerScreen> {
     // Calculate overall score (you can adjust this formula)
     int overallScore = atsScore;
 
-    // Extract improvements as a list
+    // Extract improvements as a list - FIXED TYPE HANDLING
     List<String> improvements = [];
-    if (apiData['improvements'] != null && apiData['improvements'] is List) {
-      improvements = (apiData['improvements'] as List)
-          .map((item) => item.toString())
-          .toList();
+    if (apiData['improvements'] != null) {
+      var impData = apiData['improvements'];
+      if (impData is List) {
+        // Safely convert each item to String
+        improvements = impData.map((item) => item.toString()).toList();
+      } else if (impData is String) {
+        // If it's a string, add it as a single item
+        improvements = [impData];
+      } else {
+        improvements = [impData.toString()];
+      }
+    }
+
+    // Extract resume summary - FIXED TYPE HANDLING
+    String? resumeSummary;
+    if (apiData['resume_summary'] != null) {
+      var summaryData = apiData['resume_summary'];
+      if (summaryData is String) {
+        resumeSummary = summaryData;
+      } else if (summaryData is List) {
+        resumeSummary = summaryData.map((e) => e.toString()).join(' ');
+      } else {
+        resumeSummary = summaryData.toString();
+      }
+    }
+
+    // Extract suggested job title - FIXED TYPE HANDLING
+    String? suggestedJobTitle;
+    if (apiData['suggested_job_title'] != null) {
+      var titleData = apiData['suggested_job_title'];
+      if (titleData is String) {
+        suggestedJobTitle = titleData;
+      } else if (titleData is List) {
+        suggestedJobTitle = titleData.map((e) => e.toString()).join(', ');
+      } else {
+        suggestedJobTitle = titleData.toString();
+      }
     }
 
     // Create strengths based on what's good in the resume
     List<String> strengths = [];
-    if (apiData['resume_summary'] != null) {
-      strengths.add('Resume summary available: ${apiData['resume_summary']}');
+    if (resumeSummary != null && resumeSummary.isNotEmpty) {
+      strengths.add('Resume summary available');
     }
-    if (apiData['suggested_job_title'] != null) {
-      strengths.add('Suitable for: ${apiData['suggested_job_title']}');
+    if (suggestedJobTitle != null && suggestedJobTitle.isNotEmpty) {
+      strengths.add('Suitable for: $suggestedJobTitle');
     }
     if (atsScore >= 70) {
       strengths.add('Good ATS compatibility score');
@@ -152,8 +217,8 @@ class _AIResumeCheckerScreenState extends State<AIResumeCheckerScreen> {
       'readabilityScore': (atsScore * 0.95).round(), // Estimate readability
       'strengths': strengths,
       'improvements': improvements,
-      'resumeSummary': apiData['resume_summary'],
-      'suggestedJobTitle': apiData['suggested_job_title'],
+      'resumeSummary': resumeSummary,
+      'suggestedJobTitle': suggestedJobTitle,
       'extractedData': apiData['extracted_data'],
     };
   }
@@ -163,6 +228,7 @@ class _AIResumeCheckerScreenState extends State<AIResumeCheckerScreen> {
       _selectedFileName = '';
       _selectedFilePath = null;
       _analysisResult = null;
+      _selectedDomain = null;
     });
   }
 
@@ -239,9 +305,93 @@ class _AIResumeCheckerScreenState extends State<AIResumeCheckerScreen> {
     );
   }
 
+
+
   List<Widget> _buildUploadSection(bool isDarkMode) {
     return [
-      // Keep the same container but change content based on file selection
+      // Domain Selection Dropdown
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.category,
+                  color: const Color(0xFFFF2D55),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Select Domain',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedDomain,
+              decoration: InputDecoration(
+                hintText: 'Choose your domain',
+                hintStyle: TextStyle(
+                  color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade600,
+                ),
+                filled: true,
+                fillColor: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Color(0xFFFF2D55),
+                    width: 2,
+                  ),
+                ),
+              ),
+              dropdownColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+                fontSize: 16,
+              ),
+              items: domains
+                  .map((domain) => DropdownMenuItem(
+                value: domain,
+                child: Text(
+                  domain[0].toUpperCase() + domain.substring(1),
+                ),
+              ))
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedDomain = value;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 20),
+
+      // File Upload Container
       Container(
         width: double.infinity,
         padding: const EdgeInsets.all(32),
@@ -373,9 +523,8 @@ class _AIResumeCheckerScreenState extends State<AIResumeCheckerScreen> {
       ),
       const SizedBox(height: 20),
 
-      // Show selected filename and analyze button if file is selected
+      // Show Analyze button if file is selected
       if (_selectedFileName.isNotEmpty && _analysisResult == null) ...[
-        // Analyze button
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
@@ -574,9 +723,10 @@ class _AIResumeCheckerScreenState extends State<AIResumeCheckerScreen> {
 
   List<Widget> _buildAnalysisResult(Map<String, dynamic> result, bool isDarkMode) {
     return [
-      // Overall Score
+      // ATS Score - Full Width Coverage
       Container(
-        padding: const EdgeInsets.all(24),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -591,132 +741,309 @@ class _AIResumeCheckerScreenState extends State<AIResumeCheckerScreen> {
         child: Column(
           children: [
             Text(
-              'Overall Score',
+              'ATS Score',
               style: TextStyle(
                 fontSize: 18,
                 color: isDarkMode ? Colors.white : Colors.black,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 32),
+            // Medium-Small circle with smaller percentage
             Stack(
               alignment: Alignment.center,
               children: [
                 SizedBox(
-                  width: 120,
-                  height: 120,
+                  width: 140,
+                  height: 140,
                   child: CircularProgressIndicator(
-                    value: result['score'] / 100,
+                    value: result['atsScore'] / 100,
                     color: const Color(0xFFFF2D55),
                     strokeWidth: 12,
                     backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade300,
                   ),
                 ),
-                Text(
-                  '${result['score']}%',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFFF2D55),
-                  ),
+                Column(
+                  children: [
+                    Text(
+                      '${result['atsScore']}%',
+                      style: const TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFFF2D55),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Compatibility',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildMetric('ATS Score', result['atsScore'], isDarkMode),
-                    _buildMetric('Skills Match', result['skillsMatch'], isDarkMode),
-                    _buildMetric('Readability', result['readabilityScore'], isDarkMode),
-                  ],
-                );
-              },
-            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
       const SizedBox(height: 24),
 
-      // Strengths
-      if (result['strengths'] != null && result['strengths'].isNotEmpty)
-        _buildSection('Strengths', result['strengths'], Icons.check_circle, const Color(0xFF10B981), isDarkMode),
-      if (result['strengths'] != null && result['strengths'].isNotEmpty) const SizedBox(height: 24),
+      // User Info (changed from Strengths)
+      if (result['resumeSummary'] != null || result['suggestedJobTitle'] != null)
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.person_outline,
+                    color: const Color(0xFF3B82F6),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'User Info',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Resume Summary
+              if (result['resumeSummary'] != null) ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.description,
+                        size: 16,
+                        color: Color(0xFF3B82F6),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Summary',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            result['resumeSummary'],
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Suggested Job Title
+              if (result['suggestedJobTitle'] != null) ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.work_outline,
+                        size: 16,
+                        color: Color(0xFF3B82F6),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Suggested Role',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            result['suggestedJobTitle'],
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+
+      if (result['resumeSummary'] != null || result['suggestedJobTitle'] != null)
+        const SizedBox(height: 24),
 
       // Improvements
       if (result['improvements'] != null && result['improvements'].isNotEmpty)
-        _buildSection('Areas for Improvement', result['improvements'], Icons.lightbulb_outline, const Color(0xFFFFB800), isDarkMode),
-      if (result['improvements'] != null && result['improvements'].isNotEmpty) const SizedBox(height: 32),
-
-      // Action Buttons
-      Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: _resetAnalysis,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                side: BorderSide(
-                  color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade400,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFFFB800).withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                    size: 20,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFB800).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.lightbulb_outline,
+                      color: Color(0xFFFFB800),
+                      size: 20,
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Done',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                      fontWeight: FontWeight.w600,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Areas for Improvement',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 16),
+              ...result['improvements'].asMap().entries.map((entry) {
+                int index = entry.key;
+                String item = entry.value;
+                return Padding(
+                  padding: EdgeInsets.only(
+                    bottom: index < result['improvements'].length - 1 ? 12 : 0,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFB800),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          item,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _viewDocument,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF2D55),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+        ),
+
+      if (result['improvements'] != null && result['improvements'].isNotEmpty)
+        const SizedBox(height: 32),
+
+      // Single Done Button (centered)
+      Center(
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _resetAnalysis,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF2D55),
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 2,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(
+                  Icons.check_circle,
+                  color: Colors.white,
+                  size: 22,
                 ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(
-                    Icons.visibility,
+                SizedBox(width: 12),
+                Text(
+                  'Done',
+                  style: TextStyle(
                     color: Colors.white,
-                    size: 20,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    'View Document',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     ];
   }

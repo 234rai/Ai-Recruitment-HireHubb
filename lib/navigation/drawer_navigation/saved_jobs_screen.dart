@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/job_model.dart';
 import '../../services/firestore_service.dart';
+import '../../utils/responsive_helper.dart';
 
 class SavedJobsScreen extends StatefulWidget {
   const SavedJobsScreen({super.key});
@@ -57,8 +58,10 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final responsive = ResponsiveHelper(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -69,6 +72,7 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
           icon: Icon(
             Icons.arrow_back,
             color: isDarkMode ? Colors.white : Colors.black,
+            size: responsive.iconSize(24),
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -77,6 +81,7 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
           style: TextStyle(
             color: isDarkMode ? Colors.white : Colors.black,
             fontWeight: FontWeight.bold,
+            fontSize: responsive.fontSize(20),
           ),
         ),
       ),
@@ -94,29 +99,30 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
           if (snapshot.hasError) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(responsive.padding(20)),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
                       Icons.error_outline,
-                      size: 64,
+                      size: responsive.iconSize(64),
                       color: Colors.red,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: responsive.height(16)),
                     Text(
                       'Error loading saved jobs',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: responsive.fontSize(18),
                         fontWeight: FontWeight.bold,
                         color: isDarkMode ? Colors.white : Colors.black,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: responsive.height(8)),
                     Text(
                       '${snapshot.error}',
                       style: TextStyle(
                         color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        fontSize: responsive.fontSize(14),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -129,46 +135,47 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(responsive.padding(20)),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
                       Icons.bookmark_outline,
-                      size: 80,
+                      size: responsive.iconSize(80),
                       color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade400,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: responsive.height(16)),
                     Text(
                       'No Saved Jobs Yet',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: responsive.fontSize(20),
                         fontWeight: FontWeight.bold,
                         color: isDarkMode ? Colors.white : Colors.black,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: responsive.height(8)),
                     Text(
                       'Start saving jobs you\'re interested in\nto view them here later',
                       style: TextStyle(
                         color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        fontSize: responsive.fontSize(14),
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: responsive.height(24)),
                     ElevatedButton.icon(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.search),
-                      label: const Text('Browse Jobs'),
+                      icon: Icon(Icons.search, size: responsive.iconSize(24)),
+                      label: Text('Browse Jobs', style: TextStyle(fontSize: responsive.fontSize(16))),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFF2D55),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: responsive.padding(24),
+                          vertical: responsive.padding(12),
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(responsive.radius(12)),
                         ),
                       ),
                     ),
@@ -181,11 +188,11 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
           final savedJobs = snapshot.data!;
 
           return ListView.builder(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(responsive.padding(20)),
             itemCount: savedJobs.length,
             itemBuilder: (context, index) {
               final job = savedJobs[index];
-              return _buildSavedJobCard(job, isDarkMode);
+              return _buildSavedJobCard(job, isDarkMode, responsive);
             },
           );
         },
@@ -193,21 +200,21 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
     );
   }
 
-  Widget _buildSavedJobCard(Job job, bool isDarkMode) {
+  Widget _buildSavedJobCard(Job job, bool isDarkMode, ResponsiveHelper responsive) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: responsive.height(16)),
+      padding: EdgeInsets.all(responsive.padding(16)),
       decoration: BoxDecoration(
         color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(responsive.radius(16)),
         border: job.isFeatured
             ? Border.all(color: const Color(0xFFFF2D55).withOpacity(0.3), width: 1.5)
             : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: responsive.radius(12),
+            offset: Offset(0, responsive.height(4)),
           ),
         ],
       ),
@@ -219,24 +226,24 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
             children: [
               // Company Logo
               Container(
-                width: 48,
-                height: 48,
+                width: responsive.width(48),
+                height: responsive.width(48),
                 decoration: BoxDecoration(
                   color: Color(job.logoColor).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(responsive.radius(12)),
                 ),
                 child: Center(
                   child: Text(
                     job.logo,
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: responsive.fontSize(24),
                       fontWeight: FontWeight.bold,
                       color: Color(job.logoColor),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: responsive.width(12)),
 
               // Company and Time
               Expanded(
@@ -246,16 +253,16 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
                     Text(
                       job.company,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: responsive.fontSize(14),
                         fontWeight: FontWeight.w600,
                         color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: responsive.height(2)),
                     Text(
                       job.postedTime,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: responsive.fontSize(12),
                         color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade500,
                       ),
                     ),
@@ -267,64 +274,64 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
               GestureDetector(
                 onTap: () => _unsaveJob(job.id),
                 child: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(responsive.padding(8)),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFF2D55).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(responsive.radius(8)),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.bookmark,
-                    size: 20,
-                    color: Color(0xFFFF2D55),
+                    size: responsive.iconSize(20),
+                    color: const Color(0xFFFF2D55),
                   ),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 12),
+          SizedBox(height: responsive.height(12)),
 
           // Job Position
           Text(
             job.position,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: responsive.fontSize(18),
               fontWeight: FontWeight.bold,
               color: isDarkMode ? Colors.white : Colors.black,
             ),
           ),
 
-          const SizedBox(height: 8),
+          SizedBox(height: responsive.height(8)),
 
           // Location and Type
           Row(
             children: [
               Icon(
                 Icons.location_on_outlined,
-                size: 16,
+                size: responsive.iconSize(16),
                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
               ),
-              const SizedBox(width: 4),
+              SizedBox(width: responsive.width(4)),
               Text(
                 job.country,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: responsive.fontSize(13),
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: responsive.width(12)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: responsive.padding(8), vertical: responsive.padding(4)),
                 decoration: BoxDecoration(
                   color: job.isRemote
                       ? const Color(0xFF10B981).withOpacity(0.1)
                       : Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(responsive.radius(6)),
                 ),
                 child: Text(
                   job.location,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: responsive.fontSize(11),
                     fontWeight: FontWeight.w600,
                     color: job.isRemote ? const Color(0xFF10B981) : Colors.orange,
                   ),
@@ -333,21 +340,21 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
             ],
           ),
 
-          const SizedBox(height: 12),
+          SizedBox(height: responsive.height(12)),
 
           // Salary and Apply Button
           Row(
             children: [
               Icon(
                 Icons.paid_outlined,
-                size: 16,
+                size: responsive.iconSize(16),
                 color: const Color(0xFFFF2D55),
               ),
-              const SizedBox(width: 4),
+              SizedBox(width: responsive.width(4)),
               Text(
                 job.salary,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: responsive.fontSize(14),
                   fontWeight: FontWeight.w600,
                   color: const Color(0xFFFF2D55),
                 ),
@@ -356,16 +363,16 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
               GestureDetector(
                 onTap: () => _applyForJob(job.id),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(horizontal: responsive.padding(16), vertical: responsive.padding(8)),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFF2D55),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(responsive.radius(8)),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Apply Now',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 12,
+                      fontSize: responsive.fontSize(12),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -374,23 +381,23 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
             ],
           ),
 
-          const SizedBox(height: 12),
+          SizedBox(height: responsive.height(12)),
 
           // Skills
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: responsive.width(8),
+            runSpacing: responsive.height(8),
             children: job.skills.map((skill) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: EdgeInsets.symmetric(horizontal: responsive.padding(10), vertical: responsive.padding(6)),
                 decoration: BoxDecoration(
                   color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(responsive.radius(8)),
                 ),
                 child: Text(
                   skill,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: responsive.fontSize(11),
                     color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700,
                   ),
                 ),
@@ -400,28 +407,28 @@ class _SavedJobsScreenState extends State<SavedJobsScreen> {
 
           // Featured Badge
           if (job.isFeatured) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: responsive.height(12)),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: EdgeInsets.symmetric(horizontal: responsive.padding(10), vertical: responsive.padding(6)),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF4E6),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(responsive.radius(8)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   Icon(
                     Icons.star,
-                    size: 14,
-                    color: Color(0xFFFFB800),
+                    size: responsive.iconSize(14),
+                    color: const Color(0xFFFFB800),
                   ),
-                  SizedBox(width: 4),
+                  SizedBox(width: responsive.width(4)),
                   Text(
                     'FEATURED JOB',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: responsive.fontSize(10),
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFFFFB800),
+                      color: const Color(0xFFFFB800),
                     ),
                   ),
                 ],

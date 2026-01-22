@@ -32,6 +32,39 @@ class RealtimeDatabaseService {
     }
   }
 
+  Future<Map<String, dynamic>?> getUserProfileById(String userId) async {
+    try {
+      final snapshot = await _database.ref('users/$userId/profile').get();
+
+      if (snapshot.exists) {
+        return Map<String, dynamic>.from(snapshot.value as Map);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching user profile by ID: $e');
+      return null;
+    }
+  }
+
+  Future<Uint8List?> downloadResumeForUser(String userId) async {
+    try {
+      final snapshot = await _database.ref('users/$userId/profile').get();
+
+      if (snapshot.exists) {
+        final data = Map<String, dynamic>.from(snapshot.value as Map);
+        final base64String = data['resumeBase64']?.toString();
+
+        if (base64String != null && base64String.isNotEmpty) {
+          return base64Decode(base64String);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error downloading resume for user $userId: $e');
+      return null;
+    }
+  }
+
   // Get current user ID
   String? get _currentUserId => _auth.currentUser?.uid;
 
@@ -68,10 +101,6 @@ class RealtimeDatabaseService {
       // Wait a bit for the connection test
       await Future.delayed(const Duration(seconds: 2));
       await subscription.cancel();
-
-      // Additional test: try to read a small piece of data
-      final testDataRef = _database.ref('.info');
-      final snapshot = await testDataRef.get().timeout(const Duration(seconds: 10));
 
       print('✅ Realtime Database connection test passed!');
       print('📍 Database URL: ${_database.databaseURL}');

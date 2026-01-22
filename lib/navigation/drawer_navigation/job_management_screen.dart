@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../models/job_model.dart';
 import '../../../services/firestore_service.dart';
 import '../job_post_screen.dart';
+import '../../../utils/responsive_helper.dart';
 
 class JobManagementScreen extends StatefulWidget {
   const JobManagementScreen({super.key});
@@ -18,12 +19,14 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
   String _filter = 'all';
 
   @override
+  @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final responsive = ResponsiveHelper(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manage Jobs'),
+        title: Text('Manage Jobs', style: TextStyle(fontSize: responsive.fontSize(20))),
         backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 0,
       ),
@@ -31,18 +34,18 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
         children: [
           // Filter Tabs
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: responsive.padding(20), vertical: responsive.padding(12)),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildFilterTab('All', 'all', isDarkMode),
-                  const SizedBox(width: 8),
-                  _buildFilterTab('Active', 'active', isDarkMode),
-                  const SizedBox(width: 8),
-                  _buildFilterTab('Closed', 'closed', isDarkMode),
-                  const SizedBox(width: 8),
-                  _buildFilterTab('Draft', 'draft', isDarkMode),
+                  _buildFilterTab('All', 'all', isDarkMode, responsive),
+                  SizedBox(width: responsive.width(8)),
+                  _buildFilterTab('Active', 'active', isDarkMode, responsive),
+                  SizedBox(width: responsive.width(8)),
+                  _buildFilterTab('Closed', 'closed', isDarkMode, responsive),
+                  SizedBox(width: responsive.width(8)),
+                  _buildFilterTab('Draft', 'draft', isDarkMode, responsive),
                 ],
               ),
             ),
@@ -54,7 +57,7 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
               stream: FirestoreService.getRecruiterJobs(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: Color(0xFFFF2D55)));
+                  return const Center(child: CircularProgressIndicator(color: Color(0xFFFF2D55)));
                 }
 
                 if (snapshot.hasError) {
@@ -71,14 +74,14 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
                       children: [
                         Icon(
                           Icons.work_outline,
-                          size: 64,
+                          size: responsive.iconSize(64),
                           color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: responsive.height(16)),
                         Text(
                           'No jobs found',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: responsive.fontSize(18),
                             color: isDarkMode ? Colors.white : Colors.black,
                           ),
                         ),
@@ -88,11 +91,11 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
                 }
 
                 return ListView.builder(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(responsive.padding(20)),
                   itemCount: filteredJobs.length,
                   itemBuilder: (context, index) {
                     final job = filteredJobs[index];
-                    return _buildJobCard(job, isDarkMode);
+                    return _buildJobCard(job, isDarkMode, responsive);
                   },
                 );
               },
@@ -110,12 +113,12 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
           );
         },
         backgroundColor: const Color(0xFFFF2D55),
-        child: const Icon(Icons.add, color: Colors.white),
+        child: Icon(Icons.add, color: Colors.white, size: responsive.iconSize(24)),
       ),
     );
   }
 
-  Widget _buildFilterTab(String label, String value, bool isDarkMode) {
+  Widget _buildFilterTab(String label, String value, bool isDarkMode, ResponsiveHelper responsive) {
     final isSelected = _filter == value;
 
     return GestureDetector(
@@ -125,12 +128,12 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: responsive.padding(16), vertical: responsive.padding(8)),
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFFFF2D55)
               : (isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade200),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(responsive.radius(20)),
         ),
         child: Text(
           label,
@@ -139,6 +142,7 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
                 ? Colors.white
                 : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700),
             fontWeight: FontWeight.w600,
+            fontSize: responsive.fontSize(14),
           ),
         ),
       ),
@@ -158,39 +162,39 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
     }
   }
 
-  Widget _buildJobCard(Job job, bool isDarkMode) {
+  Widget _buildJobCard(Job job, bool isDarkMode, ResponsiveHelper responsive) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: responsive.height(12)),
       color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(responsive.radius(12)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(responsive.padding(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: responsive.width(40),
+                  height: responsive.width(40),
                   decoration: BoxDecoration(
                     color: Color(job.logoColor).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(responsive.radius(10)),
                   ),
                   child: Center(
                     child: Text(
                       job.logo,
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: responsive.fontSize(18),
                         fontWeight: FontWeight.bold,
                         color: Color(job.logoColor),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: responsive.width(12)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,78 +202,107 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
                       Text(
                         job.position,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: responsive.fontSize(16),
                           fontWeight: FontWeight.w600,
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: responsive.height(4)),
                       Text(
                         job.company,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: responsive.fontSize(13),
                           color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                         ),
                       ),
                     ],
                   ),
                 ),
-                _buildStatusBadge(job.status ?? 'active'),
+                _buildStatusBadge(job.status ?? 'active', responsive),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: responsive.height(12)),
             Row(
               children: [
                 Icon(
                   Icons.location_on_outlined,
-                  size: 16,
+                  size: responsive.iconSize(16),
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: responsive.width(4)),
                 Text(
                   job.location,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: responsive.fontSize(13),
                     color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: responsive.width(16)),
                 Icon(
                   Icons.attach_money_outlined,
-                  size: 16,
+                  size: responsive.iconSize(16),
                   color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: responsive.width(4)),
                 Text(
                   job.salary,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: responsive.fontSize(13),
                     color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: responsive.height(12)),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                FutureBuilder<int>(
-                  future: FirestoreService.getJobApplicationsCount(job.id),
+                StreamBuilder<int>(
+                  stream: FirestoreService.getJobApplicationsCountStream(job.id),
                   builder: (context, snapshot) {
+                    // Debug logs
+                    if (snapshot.hasError) {
+                      print('❌ Stream error for job ${job.id}: ${snapshot.error}');
+                    }
+
+                    // Show loading indicator only initially
+                    if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                      return Row(
+                        children: [
+                          Icon(
+                            Icons.people_outline,
+                            size: responsive.iconSize(16),
+                            color: const Color(0xFFFF2D55),
+                          ),
+                          SizedBox(width: responsive.width(4)),
+                          SizedBox(
+                            width: responsive.width(16),
+                            height: responsive.width(16),
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF2D55)),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
                     final count = snapshot.data ?? 0;
+                    print('🎯 Displaying count for job ${job.id}: $count');
+
                     return Row(
                       children: [
                         Icon(
                           Icons.people_outline,
-                          size: 16,
+                          size: responsive.iconSize(16),
                           color: const Color(0xFFFF2D55),
                         ),
-                        const SizedBox(width: 4),
+                        SizedBox(width: responsive.width(4)),
                         Text(
-                          '$count applicants',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFFFF2D55),
+                          '$count applicant${count != 1 ? 's' : ''}',
+                          style: TextStyle(
+                            fontSize: responsive.fontSize(13),
+                            color: const Color(0xFFFF2D55),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -286,6 +319,7 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
                       icon: Icon(
                         Icons.more_vert,
                         color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        size: responsive.iconSize(24),
                       ),
                     ),
                   ],
@@ -298,7 +332,7 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(String status, ResponsiveHelper responsive) {
     Color color;
     String label;
 
@@ -321,15 +355,15 @@ class _JobManagementScreenState extends State<JobManagementScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: responsive.padding(12), vertical: responsive.padding(4)),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(responsive.radius(12)),
       ),
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: responsive.fontSize(12),
           fontWeight: FontWeight.w600,
           color: color,
         ),

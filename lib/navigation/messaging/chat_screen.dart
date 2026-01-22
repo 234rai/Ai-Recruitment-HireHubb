@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../services/messaging_service.dart';
-import '../../services/presence_service.dart'; // NEW
+import '../../services/presence_service.dart';
+import '../../services/user_service.dart'; // NEW
 import '../../models/message_model.dart';
 import '../../providers/role_provider.dart';
-import '../../widgets/typing_indicator.dart'; // NEW
-import '../../widgets/online_status_badge.dart'; // NEW
+import '../../widgets/typing_indicator.dart';
+import '../../widgets/online_status_badge.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
   final String otherParticipantId;
   final String jobTitle;
-  final String? otherParticipantName; // NEW: Optional participant name
+  final String? otherParticipantName;
 
   const ChatScreen({
     super.key,
@@ -28,7 +29,8 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final MessagingService _messagingService = MessagingService();
-  final PresenceService _presenceService = PresenceService(); // NEW
+  final PresenceService _presenceService = PresenceService();
+  final UserService _userService = UserService(); // NEW
   final TextEditingController _messageController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ScrollController _scrollController = ScrollController();
@@ -39,13 +41,12 @@ class _ChatScreenState extends State<ChatScreen> {
     // Mark messages as read when opening chat
     _messagingService.markConversationAsRead(widget.conversationId);
     
-    // NEW: Listen to text changes for typing indicator
+    // Listen to text changes for typing indicator
     _messageController.addListener(_onTextChanged);
   }
 
   @override
   void dispose() {
-    // NEW: Stop typing when leaving chat
     _presenceService.stopTyping(widget.conversationId);
     _messageController.removeListener(_onTextChanged);
     _messageController.dispose();
@@ -53,7 +54,6 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  // NEW: Handle text changes for typing indicator
   void _onTextChanged() {
     if (_messageController.text.isNotEmpty) {
       _presenceService.setTyping(widget.conversationId);
@@ -64,7 +64,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
 
-    // NEW: Stop typing when sending
     _presenceService.stopTyping(widget.conversationId);
 
     _messagingService.sendMessage(
@@ -74,7 +73,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     _messageController.clear();
-    // Scroll to bottom after sending
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -94,25 +92,76 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.jobTitle,
-              style: const TextStyle(fontSize: 16),
-            ),
-            // NEW: Show online status in app bar
-            OnlineStatusWithText(
-              userId: widget.otherParticipantId,
-              textStyle: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back,
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: FutureBuilder(
+          future: _userService.getAppUser(widget.otherParticipantId),
+          builder: (context, snapshot) {
+            // Use fetched name or fallback to passed name
+            final userName = snapshot.data?.displayName ?? widget.otherParticipantName ?? 'User';
+            final userPhoto = snapshot.data?.photoURL;
+            
+            return Row(
+              children: [
+                AvatarWithStatus(
+                  userId: widget.otherParticipantId,
+                  imageUrl: userPhoto,
+                  fallbackText: userName,
+                  radius: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        userName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.jobTitle,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          // Online Status Text
+                          OnlineStatusWithText(
+                            userId: widget.otherParticipantId,
+                            textStyle: TextStyle(
+                              fontSize: 12,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
       body: Column(
         children: [

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import '../services/realtime_database_service.dart';
+import '../utils/responsive_helper.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -49,7 +50,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     }
   }
 
-  Widget _getProfileAvatar(double radius) {
+  Widget _getProfileAvatar(double radius, ResponsiveHelper responsive) {
     final base64Image = _userProfile?['photoBase64']?.toString();
 
     if (base64Image != null && base64Image.isNotEmpty) {
@@ -155,6 +156,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final responsive = ResponsiveHelper(context);
 
     return Scaffold(
       backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
@@ -162,33 +164,33 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         title: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: responsive.width(36),
+              height: responsive.width(36),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFFFF2D55), Color(0xFFFF6B9D)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(responsive.radius(10)),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFFFF2D55).withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    blurRadius: responsive.radius(8),
+                    offset: Offset(0, responsive.height(2)),
                   ),
                 ],
               ),
-              child: const Icon(Icons.smart_toy, color: Colors.white, size: 18),
+              child: Icon(Icons.smart_toy, color: Colors.white, size: responsive.iconSize(18)),
             ),
-            const SizedBox(width: 12),
-            const Column(
+            SizedBox(width: responsive.width(12)),
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'HireHub AI',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: responsive.fontSize(18),
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -196,7 +198,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 Text(
                   'Your career assistant',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: responsive.fontSize(12),
                     color: Colors.white70,
                   ),
                 ),
@@ -207,9 +209,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         backgroundColor: const Color(0xFFFF2D55),
         elevation: 2,
         iconTheme: const IconThemeData(color: Colors.white),
-        shape: const RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(16),
+            bottom: Radius.circular(responsive.radius(16)),
           ),
         ),
       ),
@@ -218,20 +220,21 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(responsive.padding(16)),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 return ChatBubble(
                   message: _messages[index],
                   isDarkMode: isDarkMode,
-                  userAvatar: _getProfileAvatar(18),
+                  userAvatar: _getProfileAvatar(responsive.width(18), responsive),
+                  responsive: responsive,
                 );
               },
             ),
           ),
           if (_isLoading)
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: EdgeInsets.symmetric(vertical: responsive.padding(12)),
               decoration: BoxDecoration(
                 color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade50,
                 border: Border(
@@ -244,35 +247,35 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(
-                    width: 20,
-                    height: 20,
+                    width: responsive.width(20),
+                    height: responsive.width(20),
                     child: CircularProgressIndicator(
-                      strokeWidth: 2,
+                      strokeWidth: responsive.width(2),
                       valueColor: AlwaysStoppedAnimation<Color>(
                         const Color(0xFFFF2D55),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: responsive.width(12)),
                   Text(
                     'AI is thinking...',
                     style: TextStyle(
                       color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                      fontSize: 14,
+                      fontSize: responsive.fontSize(14),
                     ),
                   ),
                 ],
               ),
             ),
-          _buildInputArea(isDarkMode),
+          _buildInputArea(isDarkMode, responsive),
         ],
       ),
     );
   }
 
-  Widget _buildInputArea(bool isDarkMode) {
+  Widget _buildInputArea(bool isDarkMode, ResponsiveHelper responsive) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(responsive.padding(16)),
       decoration: BoxDecoration(
         color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
         border: Border(
@@ -283,8 +286,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
+            blurRadius: responsive.radius(8),
+            offset: Offset(0, -responsive.height(2)),
           ),
         ],
       ),
@@ -295,7 +298,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(responsive.radius(24)),
                   border: Border.all(
                     color: const Color(0xFFFF2D55).withOpacity(0.3),
                   ),
@@ -304,6 +307,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                   controller: _messageController,
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
+                    fontSize: responsive.fontSize(14),
                   ),
                   maxLines: null,
                   textCapitalization: TextCapitalization.sentences,
@@ -311,18 +315,19 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     hintText: 'Ask about jobs, applications, or career advice...',
                     hintStyle: TextStyle(
                       color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade600,
+                      fontSize: responsive.fontSize(14),
                     ),
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 14,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: responsive.padding(20),
+                      vertical: responsive.padding(14),
                     ),
                   ),
                   onSubmitted: (_) => _sendMessage(),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: responsive.width(12)),
             Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
@@ -330,26 +335,26 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(responsive.radius(24)),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFFFF2D55).withOpacity(0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    blurRadius: responsive.radius(8),
+                    offset: Offset(0, responsive.height(2)),
                   ),
                 ],
               ),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(responsive.radius(24)),
                   onTap: _isLoading ? null : _sendMessage,
                   child: Container(
-                    padding: const EdgeInsets.all(14),
-                    child: const Icon(
+                    padding: EdgeInsets.all(responsive.padding(14)),
+                    child: Icon(
                       Icons.send_rounded,
                       color: Colors.white,
-                      size: 22,
+                      size: responsive.iconSize(22),
                     ),
                   ),
                 ),
@@ -385,18 +390,20 @@ class ChatBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isDarkMode;
   final Widget userAvatar;
+  final ResponsiveHelper responsive;
 
   const ChatBubble({
     super.key,
     required this.message,
     required this.isDarkMode,
     required this.userAvatar,
+    required this.responsive,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: responsive.padding(16)),
       child: Row(
         mainAxisAlignment:
         message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -404,26 +411,26 @@ class ChatBubble extends StatelessWidget {
         children: [
           if (!message.isUser) ...[
             Container(
-              width: 36,
-              height: 36,
+              width: responsive.width(36),
+              height: responsive.width(36),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFFFF2D55), Color(0xFFFF6B9D)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(responsive.radius(10)),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFFFF2D55).withOpacity(0.3),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    blurRadius: responsive.radius(6),
+                    offset: Offset(0, responsive.height(2)),
                   ),
                 ],
               ),
-              child: const Icon(Icons.smart_toy, color: Colors.white, size: 18),
+              child: Icon(Icons.smart_toy, color: Colors.white, size: responsive.iconSize(18)),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: responsive.width(8)),
           ],
           Flexible(
             child: Column(
@@ -432,9 +439,9 @@ class ChatBubble extends StatelessWidget {
                   : CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: responsive.padding(16),
+                    vertical: responsive.padding(12),
                   ),
                   decoration: BoxDecoration(
                     gradient: message.isUser
@@ -445,13 +452,13 @@ class ChatBubble extends StatelessWidget {
                     )
                         : null,
                     color: message.isUser ? null : (isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey.shade100),
-                    borderRadius: BorderRadius.circular(18).copyWith(
+                    borderRadius: BorderRadius.circular(responsive.radius(18)).copyWith(
                       topLeft: message.isUser
-                          ? const Radius.circular(18)
-                          : const Radius.circular(6),
+                          ? Radius.circular(responsive.radius(18))
+                          : Radius.circular(responsive.radius(6)),
                       topRight: message.isUser
-                          ? const Radius.circular(6)
-                          : const Radius.circular(18),
+                          ? Radius.circular(responsive.radius(6))
+                          : Radius.circular(responsive.radius(18)),
                     ),
                     border: Border.all(
                       color: message.isUser
@@ -461,8 +468,8 @@ class ChatBubble extends StatelessWidget {
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+                        blurRadius: responsive.radius(4),
+                        offset: Offset(0, responsive.height(2)),
                       ),
                     ],
                   ),
@@ -470,22 +477,22 @@ class ChatBubble extends StatelessWidget {
                     message.text,
                     style: TextStyle(
                       color: message.isUser ? Colors.white : (isDarkMode ? Colors.white : Colors.black),
-                      fontSize: 15,
+                      fontSize: responsive.fontSize(15),
                       height: 1.4,
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: responsive.height(6)),
                 Padding(
                   padding: EdgeInsets.only(
-                    left: message.isUser ? 0 : 12,
-                    right: message.isUser ? 12 : 0,
+                    left: message.isUser ? 0 : responsive.padding(12),
+                    right: message.isUser ? responsive.padding(12) : 0,
                   ),
                   child: Text(
                     _formatTime(message.timestamp),
                     style: TextStyle(
                       color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade600,
-                      fontSize: 11,
+                      fontSize: responsive.fontSize(11),
                     ),
                   ),
                 ),
@@ -493,7 +500,7 @@ class ChatBubble extends StatelessWidget {
             ),
           ),
           if (message.isUser) ...[
-            const SizedBox(width: 8),
+            SizedBox(width: responsive.width(8)),
             // Use the actual user profile photo from profile
             userAvatar,
           ],
